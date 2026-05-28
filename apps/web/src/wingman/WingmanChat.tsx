@@ -1,0 +1,540 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { readApiJson } from '../lib/apiJson'
+import { WingmanChart } from './WingmanChart'
+import {
+  WINGMAN_STARTER_PROMPTS,
+  type WingmanCoachingMode,
+  type WingmanMessage,
+  type WingmanNudges,
+  type WingmanUiBlock,
+} from './types'
+import './wingman.css'
+
+type AuthFetch = (path: string, init?: RequestInit) => Promise<Response>
+
+const THREAD_KEY = 'wingmanThreadId'
+const STREAMING_ENABLED = import.meta.env.VITE_ASSISTANT_STREAMING !== 'false'
+
+type Props = {
+  authFetch: AuthFetch
+  showReminderDot: boolean
+  onOpenRecord: (focus?: 'weight' | 'activity') => void
+  onOpenNutrition: (opts?: { shoppingListId?: string }) => void
+  onOpenInsights: () => void
+  onDataChanged: () => void
+}
+
+type ThreadPayload = {
+  id: string
+  coachingMode?: WingmanCoachingMode
+  messages: WingmanMessage[]
+}
+
+function nudgesToMessage(nudges: WingmanNudges): WingmanMessage {
+  return {
+    id: `nudge-${Date.now()}`,
+    role: 'assistant',
+    content: nudges.lines.join('\n\n'),
+    uiBlocks: nudges.uiBlocks,
+  }
+}
+
+function renderUiBlock(
+  block: WingmanUiBlock,
+  key: string,
+  busy: boolean,
+  runCta: (b: WingmanUiBlock) => void,
+) {
+  if (block.type === 'chart') {
+    return <WingmanChart key={key} block={block} />
+  }
+  if (block.type === 'hint') {
+    return (
+      <p key={key} className="wingmanHint">
+        {block.text}
+      </p>
+    )
+  }
+  if (block.type === 'cta') {
+    return (
+      <button
+        key={key}
+        type="button"
+        className="wingmanCta"
+        disabled={busy}
+        onClick={() => void runCta(block)}
+      >
+        {block.label}
+      </button>
+    )
+  }
+  return null
+}
+
+export function WingmanChat({
+  authFetch,
+  showReminderDot,
+  onOpenRecord,
+  onOpenNutrition,
+  onOpenInsights,
+  onDataChanged,
+}: Props) {
+  const [open, setOpen] = useState(false)
+  const [threadId, setThreadId] = useState<string | null>(() =>
+    sessionStorage.getItem(THREAD_KEY),
+  )
+  const [messages, setMessages] = useState<WingmanMessage[]>([])
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [coachingMode, setCoachingMode] = useState<WingmanCoachingMode>('balanced')
+  const [showMemory, setShowMemory] = useState(false)
+  const [memory, setMemory] = useState<{
+    narrative: string | null
+    facts: Array<{ category: string; text: string }>
+    updatedAt: string
+  } | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = useCallback(() => {
+    const el = listRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [])
+
+  useEffect(() => {
+    if (open) scrollToBottom()
+  }, [open, messages, scrollToBottom])
+
+  const ensureThread = useCallback(async () => {
+    if (threadId) return threadId
+    const res = await authFetch('/assistant/threads', {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Wingman' }),
+    })
+    const body = await readApiJson<{ id: string }>(res)
+    if (!res.ok) throw new Error('Could not start chat thread')
+    setThreadId(body.id)
+    sessionStorage.setItem(THREAD_KEY, body.id)
+    return body.id
+  }, [authFetch, threadId])
+
+  const loadThread = useCallback(
+    async (id: string) => {
+      const res = await authFetch(`/assistant/threads/${id}`)
+      const body = await readApiJson<ThreadPayload>(res)
+      if (!res.ok) {
+        sessionStorage.removeItem(THREAD_KEY)
+        setThreadId(null)
+        return false
+      }
+      const mapped = body.messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          uiBlocks: m.uiBlocks as WingmanUiBlock[] | undefined,
+        }))
+      if (body.coachingMode === 'nutrition' || body.coachingMode === 'wellness') {
+        setCoachingMode(body.coachingMode)
+      }
+      if (mapped.length > 0) {
+        setMessages(mapped)
+        return true
+      }
+      return false
+    },
+    [authFetch],
+  )
+
+  const loadMemory = useCallback(async () => {
+    const res = await authFetch('/assistant/memory')
+    const body = await readApiJson<{
+      narrative: string | null
+      facts: Array<{ category: string; text: string }>
+      updatedAt: string
+    }>(res)
+    if (res.ok) setMemory(body)
+  }, [authFetch])
+
+  const clearMemory = useCallback(async () => {
+    setBusy(true)
+    try {
+      const res = await authFetch('/assistant/memory', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Could not clear memory')
+      setMemory({ narrative: null, facts: [], updatedAt: new Date().toISOString() })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Clear memory failed')
+    } finally {
+      setBusy(false)
+    }
+  }, [authFetch])
+
+  const loadOpening = useCallback(async () => {
+    const res = await authFetch('/assistant/nudges')
+    const nudges = await readApiJson<WingmanNudges>(res)
+    if (!res.ok) throw new Error('Could not load wingman nudges')
+    setMessages([nudgesToMessage(nudges)])
+  }, [authFetch])
+
+  const openPanel = useCallback(async () => {
+    setOpen(true)
+    setError(null)
+    setBusy(true)
+    try {
+      const stored = threadId ?? sessionStorage.getItem(THREAD_KEY)
+      if (stored) {
+        setThreadId(stored)
+        const ok = await loadThread(stored)
+        if (ok) return
+      }
+      await ensureThread()
+      await loadOpening()
+      void loadMemory()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open wingman')
+    } finally {
+      setBusy(false)
+    }
+  }, [ensureThread, loadMemory, loadOpening, loadThread, threadId])
+
+  const sendText = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed || busy) return
+      setError(null)
+      const userMsg: WingmanMessage = {
+        id: `local-u-${Date.now()}`,
+        role: 'user',
+        content: trimmed,
+      }
+      setMessages((prev) => [...prev, userMsg])
+      setBusy(true)
+      try {
+        const tid = await ensureThread()
+        const payload = JSON.stringify({ content: trimmed, coachingMode })
+
+        if (STREAMING_ENABLED) {
+          const res = await authFetch(
+            `/assistant/threads/${tid}/messages/stream`,
+            { method: 'POST', body: payload },
+          )
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}))
+            const m = (errBody as { message?: string | string[] }).message
+            throw new Error(
+              Array.isArray(m) ? m.join(', ') : typeof m === 'string' ? m : 'Send failed',
+            )
+          }
+          const assistantId = `local-a-${Date.now()}`
+          setMessages((prev) => [
+            ...prev,
+            { id: assistantId, role: 'assistant', content: '' },
+          ])
+
+          const reader = res.body?.getReader()
+          if (!reader) throw new Error('Streaming not supported')
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const chunks = buffer.split('\n\n')
+            buffer = chunks.pop() ?? ''
+            for (const chunk of chunks) {
+              const line = chunk
+                .split('\n')
+                .find((l) => l.startsWith('data: '))
+              if (!line) continue
+              const raw = line.slice(6).trim()
+              if (raw === '[DONE]') continue
+              const event = JSON.parse(raw) as {
+                type: string
+                text?: string
+                content?: string
+                uiBlocks?: WingmanUiBlock[]
+                message?: string
+                messageId?: string
+              }
+              if (event.type === 'token' && event.text) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, content: m.content + event.text }
+                      : m,
+                  ),
+                )
+              }
+              if (event.type === 'done') {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          id: event.messageId ?? assistantId,
+                          content: event.content ?? m.content,
+                          uiBlocks: event.uiBlocks as WingmanUiBlock[] | undefined,
+                        }
+                      : m,
+                  ),
+                )
+              }
+              if (event.type === 'error') {
+                throw new Error(event.message ?? 'Stream failed')
+              }
+            }
+          }
+        } else {
+          const res = await authFetch(`/assistant/threads/${tid}/messages`, {
+            method: 'POST',
+            body: payload,
+          })
+          const assistant = await readApiJson<WingmanMessage>(res)
+          if (!res.ok) {
+            const errBody = assistant as unknown as { message?: string | string[] }
+            const m = errBody.message
+            throw new Error(
+              Array.isArray(m) ? m.join(', ') : typeof m === 'string' ? m : 'Send failed',
+            )
+          }
+          setMessages((prev) => [...prev, assistant])
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Send failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [authFetch, busy, coachingMode, ensureThread],
+  )
+
+  const setMode = useCallback(
+    async (mode: WingmanCoachingMode) => {
+      setCoachingMode(mode)
+      const tid = threadId ?? sessionStorage.getItem(THREAD_KEY)
+      if (!tid) return
+      try {
+        await authFetch(`/assistant/threads/${tid}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ coachingMode: mode }),
+        })
+      } catch {
+        /* mode still applies to next message */
+      }
+    },
+    [authFetch, threadId],
+  )
+
+  const sendMessage = useCallback(() => {
+    const text = input.trim()
+    if (!text) return
+    setInput('')
+    void sendText(text)
+  }, [input, sendText])
+
+  const runCta = useCallback(
+    async (block: WingmanUiBlock) => {
+      if (block.type === 'cta') {
+        if (block.action === 'open_record') {
+          const focus =
+            block.payload?.focus === 'weight' || block.payload?.focus === 'activity'
+              ? block.payload.focus
+              : undefined
+          onOpenRecord(focus)
+          setOpen(false)
+          return
+        }
+        if (block.action === 'open_nutrition') {
+          const listId =
+            typeof block.payload?.shoppingListId === 'string'
+              ? block.payload.shoppingListId
+              : undefined
+          onOpenNutrition(listId ? { shoppingListId: listId } : undefined)
+          setOpen(false)
+          return
+        }
+        if (block.action === 'open_insights') {
+          onOpenInsights()
+          setOpen(false)
+          return
+        }
+      }
+      if (block.type !== 'cta') return
+      setBusy(true)
+      setError(null)
+      try {
+        const res = await authFetch('/assistant/actions/confirm', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: block.action,
+            payload: block.payload ?? {},
+          }),
+        })
+        const body = await readApiJson<{
+          message?: string
+          uiBlocks?: WingmanUiBlock[]
+        }>(res)
+        if (!res.ok) throw new Error('Could not complete action')
+        onDataChanged()
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-a-${Date.now()}`,
+            role: 'assistant',
+            content: body.message ?? 'Saved.',
+            uiBlocks: body.uiBlocks,
+          },
+        ])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Action failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [authFetch, onDataChanged, onOpenInsights, onOpenNutrition, onOpenRecord],
+  )
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`wingmanFab${showReminderDot ? ' hasReminder' : ''}`}
+        aria-label={open ? 'Close wingman chat' : 'Open wingman chat'}
+        title="Wellness wingman"
+        onClick={() => (open ? setOpen(false) : void openPanel())}
+      >
+        {open ? '×' : '💬'}
+      </button>
+
+      {open ? (
+        <div className="wingmanPanel" role="dialog" aria-label="Wellness wingman chat">
+          <header className="wingmanHeader">
+            <div>
+              <h2>Wingman</h2>
+              <p>Log weight & activities · gentle reminders</p>
+              <div className="wingmanModeRow" role="group" aria-label="Coaching mode">
+                {(['balanced', 'nutrition', 'wellness'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`wingmanModeBtn${coachingMode === mode ? ' active' : ''}`}
+                    disabled={busy}
+                    onClick={() => void setMode(mode)}
+                  >
+                    {mode === 'balanced' ? 'Balanced' : mode === 'nutrition' ? 'Nutrition' : 'Wellness'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="wingmanHeaderActions">
+              <button
+                type="button"
+                className={`wingmanMemoryBtn${showMemory ? ' active' : ''}`}
+                aria-expanded={showMemory}
+                disabled={busy}
+                onClick={() => {
+                  setShowMemory((v) => !v)
+                  void loadMemory()
+                }}
+              >
+                Memory
+              </button>
+              <button
+                type="button"
+                className="wingmanClose"
+                aria-label="Close"
+                onClick={() => setOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+          </header>
+
+          {showMemory ? (
+            <section className="wingmanMemoryPanel" aria-label="Long-term memory">
+              <p className="wingmanMemoryIntro">
+                Saved across all chats (not this thread only). Profile restrictions are
+                seeded automatically.
+              </p>
+              {memory?.narrative ? (
+                <p className="wingmanMemoryNarrative">{memory.narrative}</p>
+              ) : null}
+              {memory?.facts?.length ? (
+                <ul className="wingmanMemoryList">
+                  {memory.facts.map((f) => (
+                    <li key={`${f.category}-${f.text}`}>
+                      <span className="wingmanMemoryTag">{f.category}</span> {f.text}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="wingmanMemoryEmpty">No long-term memory yet — chat to build it.</p>
+              )}
+              <button
+                type="button"
+                className="wingmanMemoryClear"
+                disabled={busy || !memory?.facts?.length && !memory?.narrative}
+                onClick={() => void clearMemory()}
+              >
+                Clear memory
+              </button>
+            </section>
+          ) : null}
+
+          {error ? <p className="wingmanErr">{error}</p> : null}
+
+          <div className="wingmanStarters">
+            {WINGMAN_STARTER_PROMPTS[coachingMode].map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                className="wingmanStarterChip"
+                disabled={busy}
+                onClick={() => void sendText(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+
+          <div className="wingmanMessages" ref={listRef}>
+            {messages.map((m) => (
+              <div key={m.id} className={`wingmanMsg ${m.role}`}>
+                {m.content}
+                {m.uiBlocks?.length ? (
+                  <div className="wingmanBlocks">
+                    {m.uiBlocks.map((b, i) =>
+                      renderUiBlock(b, `${m.id}-block-${i}`, busy, runCta),
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            {busy ? <p className="wingmanMsg assistant wingmanTyping">…</p> : null}
+          </div>
+
+          <form
+            className="wingmanComposer"
+            onSubmit={(e) => {
+              e.preventDefault()
+              sendMessage()
+            }}
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask or e.g. record 1 hour tennis for today"
+              disabled={busy}
+              aria-label="Message wingman"
+            />
+            <button type="submit" disabled={busy || !input.trim()}>
+              Send
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </>
+  )
+}

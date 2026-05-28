@@ -1,0 +1,609 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { OpenAiClientService } from '../ai/openai-client.service';
+import { AssistantLlmService } from '../ai/llm/assistant-llm.service';
+import { AssistantWingmanService } from './assistant-wingman.service';
+import { ThreadSummaryService } from './thread-summary.service';
+import { UserMemoryService } from './user-memory.service';
+import type { WingmanStreamEvent } from '../ai/llm/wingman-stream.types';
+import { MealPlansService } from '../meal-plans/meal-plans.service';
+import { ProfileService } from '../profile/profile.service';
+import { ShoppingListsService } from '../shopping-lists/shopping-lists.service';
+import { ActivityRecordDto } from '../profile/dto/activity-record.dto';
+import { MetricRecordDto } from '../profile/dto/metric-record.dto';
+import type { AssistantUiBlock } from './assistant-ui.types';
+import type { Phase3BootstrapReport } from './assistant.types';
+import type { ConfirmAssistantActionDto } from './dto/confirm-action.dto';
+import type { PatchAssistantThreadDto } from './dto/patch-thread.dto';
+
+const DESIGN_REPO_DEFAULT = 'docs/';
+
+@Injectable()
+export class AssistantService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly openai: OpenAiClientService,
+    private readonly assistantLlm: AssistantLlmService,
+    private readonly wingman: AssistantWingmanService,
+    private readonly profile: ProfileService,
+    private readonly mealPlans: MealPlansService,
+    private readonly shoppingLists: ShoppingListsService,
+    private readonly threadSummary: ThreadSummaryService,
+    private readonly userMemory: UserMemoryService,
+  ) {}
+
+  getUserMemory(userId: string) {
+    return this.userMemory.getForUser(userId);
+  }
+
+  clearUserMemory(userId: string) {
+    return this.userMemory.clearForUser(userId);
+  }
+
+  /** Full wingman chat (rule-based for now; Anthropic when configured later). */
+  chatEnabled(): boolean {
+    const flag = this.config.get<string>('ASSISTANT_ENABLED');
+    return flag !== 'false';
+  }
+
+  async getBootstrapReport(): Promise<Phase3BootstrapReport> {
+    const assistantTables = await this.hasAssistantTables();
+    const wingmanChat = this.assistantLlm.wingmanChatConfigured();
+
+    return {
+      phase: 'bootstrap',
+      designRepo:
+        this.config.get<string>('AI_ASSISTANT_DESIGN_REPO') ??
+        DESIGN_REPO_DEFAULT,
+      enabled: this.chatEnabled(),
+      providers: {
+        parts12OpenAi: Boolean(this.openai.apiKey),
+        assistantAnthropic: wingmanChat,
+        visionGemini: Boolean(
+          this.config.get<string>('GEMINI_API_KEY')?.trim(),
+        ),
+      },
+      database: { assistantTables },
+      checklist: this.buildChecklist(assistantTables, wingmanChat),
+    };
+  }
+
+  async createThread(userId: string, title?: string) {
+    return this.prisma.assistantThread.create({
+      data: { userId, title: title?.trim() || null },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+  }
+
+  async listThreads(userId: string) {
+    const rows = await this.prisma.assistantThread.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { content: true, role: true, createdAt: true },
+        },
+      },
+    });
+    return rows.map((t) => ({
+      id: t.id,
+      title: t.title,
+      updatedAt: t.updatedAt,
+      preview: t.messages[0]?.content?.slice(0, 120) ?? null,
+    }));
+  }
+
+  async getThread(userId: string, threadId: string) {
+    const thread = await this.prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      include: {
+        messages: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!thread) throw new NotFoundException('Thread not found');
+    return {
+      id: thread.id,
+      title: thread.title,
+      summary: thread.summary,
+      coachingMode: thread.coachingMode ?? 'balanced',
+      messages: thread.messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        uiBlocks: m.uiBlocks,
+        toolTraces: m.toolTraces,
+        createdAt: m.createdAt,
+      })),
+    };
+  }
+
+  async deleteThread(userId: string, threadId: string) {
+    const thread = await this.prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true },
+    });
+    if (!thread) throw new NotFoundException('Thread not found');
+    await this.prisma.assistantThread.delete({ where: { id: threadId } });
+    return { ok: true };
+  }
+
+  async getNudges(userId: string) {
+    const status = await this.reminderStatus(userId);
+    const lines: string[] = [
+      'Hi — I’m your wellness wingman. I can nudge you to log weight or activities, and help record them when you ask (with your confirmation).',
+    ];
+    const uiBlocks: AssistantUiBlock[] = [];
+
+    if (status.weightDue) {
+      lines.push(
+        'Would you like to record your weekly weight now? Tell me your weight in kg, or open the Record tab.',
+      );
+      uiBlocks.push({
+        type: 'cta',
+        label: 'Open Record tab',
+        action: 'open_record',
+        payload: { focus: 'weight' },
+      });
+    }
+    if (status.activityDue) {
+      lines.push(
+        'Would you like to log an activity now? For example: “record 1 hour tennis for today”.',
+      );
+      uiBlocks.push({
+        type: 'cta',
+        label: 'Open Record tab',
+        action: 'open_record',
+        payload: { focus: 'activity' },
+      });
+    }
+
+    if (status.weeklyCheckIn) {
+      lines.push(
+        'Weekly check-in: how are energy, sleep, and movement this week? You can ask about progress, log weight, or review your meal plan.',
+      );
+      uiBlocks.push({
+        type: 'cta',
+        label: 'View Insights',
+        action: 'open_insights',
+      });
+    }
+
+    return { lines, uiBlocks, status };
+  }
+
+  async patchThread(
+    userId: string,
+    threadId: string,
+    dto: PatchAssistantThreadDto,
+  ) {
+    const thread = await this.prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true },
+    });
+    if (!thread) throw new NotFoundException('Thread not found');
+    if (!dto.coachingMode) {
+      throw new BadRequestException('No fields to update');
+    }
+    return this.prisma.assistantThread.update({
+      where: { id: threadId },
+      data: { coachingMode: dto.coachingMode },
+      select: {
+        id: true,
+        title: true,
+        coachingMode: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async handleUserMessage(
+    userId: string,
+    threadId: string,
+    content: string,
+    coachingMode?: 'balanced' | 'nutrition' | 'wellness',
+  ) {
+    if (!this.chatEnabled()) {
+      throw new BadRequestException(
+        'Wingman chat is disabled (ASSISTANT_ENABLED=false).',
+      );
+    }
+
+    if (coachingMode) {
+      await this.prisma.assistantThread.updateMany({
+        where: { id: threadId, userId },
+        data: { coachingMode },
+      });
+    }
+
+    await this.persistUserMessage(userId, threadId, content);
+    const reply = await this.wingman.generateReply(
+      userId,
+      threadId,
+      content.trim(),
+    );
+    const saved = await this.persistAssistantMessage(
+      threadId,
+      reply.content,
+      reply.uiBlocks,
+      reply.toolTraces,
+    );
+    void this.threadSummary.maybeUpdate(threadId);
+    void this.userMemory.maybeConsolidate(userId);
+    return saved;
+  }
+
+  async *handleUserMessageStream(
+    userId: string,
+    threadId: string,
+    content: string,
+    coachingMode?: 'balanced' | 'nutrition' | 'wellness',
+  ): AsyncGenerator<WingmanStreamEvent & { messageId?: string }> {
+    if (!this.chatEnabled()) {
+      yield {
+        type: 'error',
+        message: 'Wingman chat is disabled (ASSISTANT_ENABLED=false).',
+      };
+      return;
+    }
+
+    if (coachingMode) {
+      await this.prisma.assistantThread.updateMany({
+        where: { id: threadId, userId },
+        data: { coachingMode },
+      });
+    }
+
+    await this.persistUserMessage(userId, threadId, content);
+
+    if (!this.wingman.streamingEnabled()) {
+      const reply = await this.wingman.generateReply(
+        userId,
+        threadId,
+        content.trim(),
+      );
+      const saved = await this.persistAssistantMessage(
+        threadId,
+        reply.content,
+        reply.uiBlocks,
+        reply.toolTraces,
+      );
+      void this.threadSummary.maybeUpdate(threadId);
+      void this.userMemory.maybeConsolidate(userId);
+      yield {
+        type: 'done',
+        content: saved.content,
+        uiBlocks: saved.uiBlocks as AssistantUiBlock[] | undefined,
+        toolTraces: saved.toolTraces as Array<{
+          name: string;
+          args: unknown;
+          resultSummary: string;
+        }>,
+        messageId: saved.id,
+      };
+      return;
+    }
+
+    for await (const event of this.wingman.generateReplyStream(
+      userId,
+      threadId,
+      content.trim(),
+    )) {
+      if (event.type !== 'done') {
+        yield event;
+        continue;
+      }
+
+      const saved = await this.persistAssistantMessage(
+        threadId,
+        event.content,
+        event.uiBlocks as AssistantUiBlock[] | undefined,
+        event.toolTraces,
+      );
+      void this.threadSummary.maybeUpdate(threadId);
+      void this.userMemory.maybeConsolidate(userId);
+      yield {
+        type: 'done',
+        content: saved.content,
+        uiBlocks: saved.uiBlocks as AssistantUiBlock[] | undefined,
+        toolTraces: saved.toolTraces as Array<{
+          name: string;
+          args: unknown;
+          resultSummary: string;
+        }>,
+        messageId: saved.id,
+      };
+    }
+  }
+
+  async confirmAction(userId: string, dto: ConfirmAssistantActionDto) {
+    if (dto.action === 'confirm_log_activity') {
+      const activityType =
+        typeof dto.payload.activityType === 'string'
+          ? dto.payload.activityType
+          : '';
+      const durationMinutes = Number(dto.payload.durationMinutes);
+      if (!activityType || !Number.isFinite(durationMinutes)) {
+        throw new BadRequestException('Invalid activity payload');
+      }
+      const body: ActivityRecordDto = {
+        activityType,
+        durationMinutes,
+        activityAt:
+          typeof dto.payload.activityAt === 'string'
+            ? dto.payload.activityAt
+            : undefined,
+        notes:
+          typeof dto.payload.notes === 'string' ? dto.payload.notes : undefined,
+      };
+      const result = await this.profile.recordActivity(userId, body);
+      return {
+        ok: true,
+        action: dto.action,
+        result,
+        message: `Logged ${result.activity.activityTypeLabel} (${result.activity.durationMinutes} min).`,
+      };
+    }
+
+    if (dto.action === 'confirm_log_weight') {
+      const weightKg = Number(dto.payload.weightKg);
+      if (!Number.isFinite(weightKg)) {
+        throw new BadRequestException('Invalid weight payload');
+      }
+      const body: MetricRecordDto = {
+        weightKg,
+        recordedAt:
+          typeof dto.payload.recordedAt === 'string'
+            ? dto.payload.recordedAt
+            : undefined,
+        source: 'wingman',
+      };
+      const result = await this.profile.recordMetric(userId, body);
+      return {
+        ok: true,
+        action: dto.action,
+        result,
+        message: `Recorded weight ${weightKg} kg.`,
+      };
+    }
+
+    if (dto.action === 'confirm_regenerate_meal') {
+      const versionId =
+        typeof dto.payload.versionId === 'string' ? dto.payload.versionId : '';
+      const mealId =
+        typeof dto.payload.mealId === 'string' ? dto.payload.mealId : '';
+      if (!versionId || !mealId) {
+        throw new BadRequestException('Invalid meal regenerate payload');
+      }
+      const updated = await this.mealPlans.regenerateMeal(
+        versionId,
+        userId,
+        mealId,
+      );
+      const mealTitle =
+        typeof dto.payload.mealTitle === 'string'
+          ? dto.payload.mealTitle
+          : 'meal';
+      const newMeal = updated.meals.find((m) => m.id === mealId);
+      return {
+        ok: true,
+        action: dto.action,
+        result: updated,
+        message: newMeal
+          ? `Regenerated ${mealTitle} → ${newMeal.title}. Open Nutrition to review.`
+          : `Regenerated ${mealTitle}. Open Nutrition to review.`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Nutrition tab',
+            action: 'open_nutrition' as const,
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_generate_shopping_list') {
+      const versionId =
+        typeof dto.payload.versionId === 'string' ? dto.payload.versionId : '';
+      if (!versionId) {
+        throw new BadRequestException('Invalid shopping list payload');
+      }
+      const list = await this.shoppingLists.generateFromVersion(
+        userId,
+        versionId,
+        'Wingman shopping list',
+      );
+      return {
+        ok: true,
+        action: dto.action,
+        result: list,
+        message: `Shopping list created (${list.items?.length ?? 0} items).`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open shopping list',
+            action: 'open_nutrition' as const,
+            payload: { focus: 'shopping', shoppingListId: list.id },
+          },
+        ],
+      };
+    }
+
+    throw new BadRequestException('Unknown action');
+  }
+
+  private async persistAssistantMessage(
+    threadId: string,
+    content: string,
+    uiBlocks?: AssistantUiBlock[],
+    toolTraces?: Array<{
+      name: string;
+      args: unknown;
+      resultSummary: string;
+    }>,
+  ) {
+    const row = await this.prisma.assistantMessage.create({
+      data: {
+        threadId,
+        role: 'assistant',
+        content,
+        uiBlocks: uiBlocks?.length
+          ? (uiBlocks as unknown as Prisma.InputJsonValue)
+          : undefined,
+        toolTraces: toolTraces?.length
+          ? (toolTraces as unknown as Prisma.InputJsonValue)
+          : undefined,
+      },
+    });
+    await this.prisma.assistantThread.update({
+      where: { id: threadId },
+      data: { updatedAt: new Date() },
+    });
+    return {
+      id: row.id,
+      role: 'assistant' as const,
+      content: row.content,
+      uiBlocks: row.uiBlocks ?? undefined,
+      toolTraces: row.toolTraces ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  private async persistUserMessage(
+    userId: string,
+    threadId: string,
+    content: string,
+  ) {
+    const thread = await this.prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true },
+    });
+    if (!thread) throw new NotFoundException('Thread not found');
+
+    const message = await this.prisma.assistantMessage.create({
+      data: {
+        threadId,
+        role: 'user',
+        content: content.trim(),
+      },
+    });
+    await this.prisma.assistantThread.update({
+      where: { id: threadId },
+      data: { updatedAt: new Date() },
+    });
+    return message;
+  }
+
+  private async reminderStatus(userId: string) {
+    const [metrics, activities] = await Promise.all([
+      this.profile.listMetrics(userId, 30, 1),
+      this.profile.listActivities(userId, 7, 1),
+    ]);
+    const weightAt = metrics[0]?.recordedAt
+      ? new Date(metrics[0].recordedAt as string | Date)
+      : null;
+    const activityAt = activities[0]?.activityAt
+      ? new Date(activities[0].activityAt as string | Date)
+      : null;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const dayMs = 24 * 60 * 60 * 1000;
+    const weightDue = !weightAt || Date.now() - weightAt.getTime() >= weekMs;
+    const activityDue =
+      !activityAt || Date.now() - activityAt.getTime() >= dayMs;
+    const fiveDays = 5 * dayMs;
+    const staleProfile =
+      (!weightAt || Date.now() - weightAt.getTime() >= fiveDays) &&
+      (!activityAt || Date.now() - activityAt.getTime() >= fiveDays);
+    const weeklyCheckIn = staleProfile && !weightDue && !activityDue;
+    return {
+      weightDue,
+      activityDue,
+      weeklyCheckIn,
+    };
+  }
+
+  private async hasAssistantTables(): Promise<boolean> {
+    try {
+      await this.prisma.assistantThread.count();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private buildChecklist(
+    assistantTables: boolean,
+    anthropicConfigured: boolean,
+  ) {
+    const openAi = Boolean(this.openai.apiKey);
+    return [
+      {
+        id: 'parts-12-openai',
+        title: 'Parts 1–2: meal plans, insights, RAG (OpenAI)',
+        owner: 'code' as const,
+        status: openAi ? ('done' as const) : ('todo' as const),
+        notes: openAi ? undefined : 'Set OPENAI_API_KEY for full AI features',
+      },
+      {
+        id: 'assistant-schema',
+        title: 'AssistantThread + AssistantMessage tables',
+        owner: 'code' as const,
+        status: assistantTables ? ('done' as const) : ('todo' as const),
+        notes: assistantTables ? undefined : 'Run prisma migrate deploy',
+      },
+      {
+        id: 'assistant-bootstrap-api',
+        title: 'GET /api/assistant/bootstrap readiness report',
+        owner: 'code' as const,
+        status: 'done' as const,
+      },
+      {
+        id: 'assistant-thread-crud',
+        title: 'Thread CRUD (no LLM replies yet)',
+        owner: 'code' as const,
+        status: assistantTables ? ('stub' as const) : ('todo' as const),
+      },
+      {
+        id: 'anthropic-wingman',
+        title: 'Wingman LLM + tool loop (7 tools)',
+        owner: 'both' as const,
+        status:
+          anthropicConfigured || Boolean(this.openai.apiKey)
+            ? ('stub' as const)
+            : ('todo' as const),
+        notes:
+          'ANTHROPIC_API_KEY or OPENAI_API_KEY; see docs/PROMPT_EXAMPLES.md',
+      },
+      {
+        id: 'gemini-meal-photo',
+        title: 'Gemini vision → structured foods → DB calories',
+        owner: 'code' as const,
+        status: Boolean(this.config.get<string>('GEMINI_API_KEY')?.trim())
+          ? ('done' as const)
+          : ('todo' as const),
+        notes: 'POST /api/meal-photos/analyze + confirm',
+      },
+      {
+        id: 'assistant-ui',
+        title: 'Chat panel + chart ui_blocks in web',
+        owner: 'code' as const,
+        status: 'stub' as const,
+      },
+      {
+        id: 'design-docs',
+        title: 'Architecture, API sketch, roadmap',
+        owner: 'docs' as const,
+        status: 'done' as const,
+      },
+    ];
+  }
+}

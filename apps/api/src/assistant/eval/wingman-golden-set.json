@@ -1,0 +1,78 @@
+[
+  {
+    "id": "health-bmi",
+    "message": "What's my current BMI?",
+    "expectTools": ["get_health_metrics"],
+    "argHints": { "metric_type": "bmi" }
+  },
+  {
+    "id": "health-weight-trend",
+    "message": "How has my weight changed this month?",
+    "expectTools": ["get_health_metrics", "get_chart_data"],
+    "anyOfTools": true
+  },
+  {
+    "id": "progress-goal",
+    "message": "How close am I to my weight goal?",
+    "expectTools": ["get_progress_summary"]
+  },
+  {
+    "id": "meal-today",
+    "message": "What's on my meal plan today?",
+    "expectTools": ["get_meal_plan"]
+  },
+  {
+    "id": "nutrition-calories",
+    "message": "How many calories have I consumed today?",
+    "expectTools": ["get_nutrition_summary"]
+  },
+  {
+    "id": "nutrition-protein",
+    "message": "Am I meeting my protein target?",
+    "expectTools": ["get_nutrition_summary", "get_chart_data"],
+    "anyOfTools": true
+  },
+  {
+    "id": "chart-weight",
+    "message": "Show my weight trend for the last month",
+    "expectTools": ["get_chart_data"],
+    "argHints": { "chart_type": "weight_trend" }
+  },
+  {
+    "id": "chart-protein",
+    "message": "Show protein vs my target",
+    "expectTools": ["get_chart_data"],
+    "argHints": { "chart_type": "protein_vs_target" }
+  },
+  {
+    "id": "recipe-search",
+    "message": "Find high protein chicken dinner recipes",
+    "expectTools": ["search_recipes"]
+  },
+  {
+    "id": "wellness-sleep",
+    "message": "How can I improve my sleep habits?",
+    "expectTools": [],
+    "allowNoTools": true
+  },
+  {
+    "id": "log-activity",
+    "message": "record 1 hour tennis for today",
+    "expectIntent": "log_activity"
+  },
+  {
+    "id": "log-weight",
+    "message": "record weight 76.5 kg",
+    "expectIntent": "log_weight"
+  },
+  {
+    "id": "regenerate-dinner",
+    "message": "regenerate dinner for today",
+    "expectIntent": "regenerate_meal"
+  },
+  {
+    "id": "shopping-list",
+    "message": "create a shopping list from my meal plan",
+    "expectIntent": "shopping_list"
+  }
+]

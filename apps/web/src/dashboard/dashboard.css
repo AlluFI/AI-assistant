@@ -1,0 +1,589 @@
+.healthOverview {
+  gap: 1rem;
+}
+
+.recordFormsGrid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 720px) {
+  .recordFormsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.recordForm {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.recordForm h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.recordTableWrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.recordTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.recordTable th,
+.recordTable td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.recordTable th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.recordTableActions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.recordFormActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.recordEditingHint {
+  margin: 0 0 0.25rem;
+  color: var(--primary);
+}
+
+.recordHistoryHead {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.recordHistoryFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.recordHistoryTabs {
+  margin: 0;
+}
+
+.recordActionBtn {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+}
+
+.recordActionBtn:first-child {
+  margin-left: 0;
+}
+
+.recordRowEditing td {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.healthDashboardGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .healthDashboardGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.vizBlock {
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-soft);
+}
+
+.vizBlockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.vizBlockHead h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.vizHeadValue {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.vizHeadValue.muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.vizError {
+  margin: 0;
+}
+
+.vizEmpty {
+  margin: 0.5rem 0;
+}
+
+/* BMI spectrum */
+.bmiSpectrumTrack {
+  position: relative;
+  margin-top: 2rem;
+  margin-bottom: 0.15rem;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.bmiSpectrumBar {
+  display: flex;
+  height: 1.1rem;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+}
+
+.bmiSpectrumSegment {
+  height: 100%;
+}
+
+.bmiSpectrumMarker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.bmiSpectrumMarkerLabel {
+  position: absolute;
+  bottom: calc(100% + 0.45rem);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.35rem;
+  white-space: nowrap;
+  color: #0f172a;
+  background: #fff;
+  border: 2px solid var(--marker-accent, #0f172a);
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 35%),
+    0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.bmiSpectrumMarkerStem {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  width: 2px;
+  height: 0.45rem;
+  transform: translateX(-50%);
+  background: var(--marker-accent, #0f172a);
+  border-radius: 1px;
+}
+
+.bmiSpectrumMarkerDot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--marker-accent, #0f172a);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 20%),
+    0 2px 6px rgb(0 0 0 / 35%);
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .bmiSpectrumMarkerLabel {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.bmiSpectrumLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.bmiLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.bmiLegendSwatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+}
+
+.bmiHealthyHint {
+  margin: 0.45rem 0 0;
+}
+
+/* Wellness gauge */
+.wellnessGaugeRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+@media (max-width: 520px) {
+  .wellnessGaugeRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wellnessGauge {
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wellnessGaugeRing {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wellnessGaugeInner {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.wellnessGaugeScore {
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.wellnessGaugeSub {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.wellnessComponentsChart {
+  min-width: 0;
+}
+
+/* Goals */
+.goalTracker {
+  margin-top: 1rem;
+}
+
+.goalTrack + .goalTrack {
+  margin-top: 0.65rem;
+}
+
+.goalTrackHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.goalTrackPct {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.goalTrackMeta {
+  margin: 0.25rem 0 0;
+}
+
+.milestoneRow {
+  margin-top: 0.75rem;
+}
+
+.milestoneChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.milestoneChip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--muted);
+}
+
+.milestoneChip.achieved {
+  border-color: #14b8a6;
+  background: rgb(20 184 166 / 15%);
+  color: #0f766e;
+}
+
+/* Comparison */
+.compareRow + .compareRow {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+
+.compareValues {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 480px) {
+  .compareValues {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compareCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.compareTag {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.comparePct strong {
+  color: var(--primary);
+}
+
+.insightLead {
+  margin-top: 0.35rem;
+}
+
+.quickTips {
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+
+.quickTips ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.quickTips li + li {
+  margin-top: 0.25rem;
+}
+
+/* Heatmap */
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.heatmapCell {
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.35rem;
+  text-align: center;
+  min-height: 3.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.heatmapValue {
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+.heatmapLabel {
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+/* Chart panel */
+.chartPanelHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.chartPanelHead h2 {
+  margin: 0;
+}
+
+.chartRangeLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.chartRangeLabel select {
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+}
+
+:root {
+  --gauge-track: rgb(148 163 184 / 25%);
+}
+
+[data-theme='dark'] {
+  --gauge-track: rgb(71 85 105 / 45%);
+}
+
+[data-theme='dark'] .milestoneChip.achieved {
+  color: #5eead4;
+}
+
+[data-theme='dark'] .priorityBadge.high {
+  background: rgb(127 29 29 / 50%);
+  color: #fecaca;
+}
+
+/* Unified progress chart */
+.unifiedProgress {
+  margin-top: 0.75rem;
+}
+
+.metricProgressGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .metricProgressGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.metricProgressRow {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  background: var(--bg-soft);
+}
+
+.metricProgressHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.metricProgressLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-left: 3px solid;
+  padding-left: 0.4rem;
+}
+
+.metricProgressPct {
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.metricCompare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.chartControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.chartTargetToggle {
+  margin: 0;
+}
+
+.chartAxisHint {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.chartTooltip {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+}
+
+.chartTooltipTitle {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+}
+
+.chartTooltip p {
+  margin: 0.15rem 0;
+}

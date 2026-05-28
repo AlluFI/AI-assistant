@@ -1,0 +1,17 @@
+node_modules
+.pnpm-store
+.env
+**/.env
+.env.*
+!.env.example
+dist
+coverage
+*.log
+.DS_Store
+apps/api/generated
+REQUIREMENTS_QUICKCHECK.local.md
+REQUIREMENTS_TOP20.local.md
+REQUIREMENTS_AUDIT.local.md
+PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.local.md
+SYNC_FROM_PART1.local.md
+COMPLIANCE_REPORT.md

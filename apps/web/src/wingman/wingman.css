@@ -1,0 +1,412 @@
+/* Wingman chat — uses global tokens from index.css (data-theme on :root) */
+
+.wingmanFab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 250;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(145deg, #0d9488, #2563eb);
+  box-shadow:
+    0 4px 14px rgb(15 23 42 / 25%),
+    0 0 0 1px rgb(255 255 255 / 12%) inset;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.wingmanFab:hover {
+  transform: scale(1.05);
+}
+
+.wingmanFab.hasReminder::after {
+  content: '';
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  border: 2px solid var(--bg);
+}
+
+.wingmanPanel {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.25rem;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: min(32rem, calc(100vh - 7rem));
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 12px 40px rgb(15 23 42 / 22%),
+    0 0 0 1px rgb(15 23 42 / 6%);
+}
+
+:root[data-theme='dark'] .wingmanPanel {
+  box-shadow:
+    0 12px 40px rgb(0 0 0 / 45%),
+    0 0 0 1px rgb(255 255 255 / 6%);
+}
+
+.wingmanHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(120deg, #0f766e, #1d4ed8);
+  color: #fff;
+}
+
+.wingmanHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.wingmanHeader p {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.92;
+  color: rgb(255 255 255 / 92%);
+}
+
+.wingmanModeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+}
+
+.wingmanModeBtn {
+  border: 1px solid rgb(255 255 255 / 35%);
+  background: rgb(0 0 0 / 12%);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.wingmanModeBtn.active {
+  background: rgb(255 255 255 / 95%);
+  color: #0f766e;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.wingmanModeBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wingmanHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wingmanMemoryBtn {
+  border: 1px solid rgb(255 255 255 / 35%);
+  background: rgb(0 0 0 / 12%);
+  color: #fff;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.wingmanMemoryBtn.active {
+  background: rgb(255 255 255 / 92%);
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.wingmanClose {
+  border: none;
+  background: rgb(255 255 255 / 18%);
+  color: inherit;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.wingmanMemoryPanel {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.wingmanMemoryIntro {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.wingmanMemoryNarrative {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.wingmanMemoryList {
+  margin: 0 0 0.4rem;
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.wingmanMemoryTag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.wingmanMemoryEmpty {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.wingmanMemoryClear {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--text);
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.wingmanMemoryClear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wingmanClose:hover {
+  background: rgb(255 255 255 / 28%);
+}
+
+.wingmanMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: var(--bg-soft);
+}
+
+.wingmanMsg {
+  max-width: 92%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wingmanMsg.user {
+  align-self: flex-end;
+  background: #2563eb;
+  color: #fff;
+  border-bottom-right-radius: 0.2rem;
+}
+
+:root[data-theme='dark'] .wingmanMsg.user {
+  background: #3b82f6;
+}
+
+.wingmanMsg.assistant {
+  align-self: flex-start;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 0.2rem;
+}
+
+:root[data-theme='light'] .wingmanMsg.assistant {
+  background: #fff;
+}
+
+.wingmanStarters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.wingmanStarterChip {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--chip-ink);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+}
+
+.wingmanStarterChip:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.wingmanBlocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.wingmanHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.wingmanChart {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.35rem 0.15rem;
+}
+
+.wingmanChartTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 0 0.25rem;
+}
+
+.wingmanChartCaption {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.wingmanChartEmpty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.wingmanTyping {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.wingmanCtas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.wingmanCta {
+  border: 1px solid var(--primary);
+  background: var(--bg-elev);
+  color: var(--primary);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wingmanCta:hover:not(:disabled) {
+  background: var(--bg-soft);
+}
+
+.wingmanCta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wingmanComposer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.wingmanComposer input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.wingmanComposer input::placeholder {
+  color: var(--muted);
+}
+
+.wingmanComposer input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.wingmanComposer button {
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:root[data-theme='light'] .wingmanComposer button {
+  color: #fff;
+}
+
+.wingmanComposer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wingmanErr {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+}
+
+:root[data-theme='dark'] .wingmanErr {
+  color: #fecaca;
+  background: #450a0a;
+  border-bottom-color: #7f1d1d;
+}

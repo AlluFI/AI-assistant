@@ -1,0 +1,479 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  displayName     String?
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+
+  totpSecret   String?
+  totpEnabled  Boolean   @default(false)
+  backupCodes  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailVerificationTokens EmailVerificationToken[]
+  oauthAccounts           OAuthAccount[]
+  passwordResetTokens     PasswordResetToken[]
+  emailChangeTokens       EmailChangeToken[]
+  healthProfile           HealthProfile?
+  healthMetricSnapshots   HealthMetricSnapshot[]
+  activityLogs            ActivityLog[]
+  aiInsights              AIInsight[]
+  nutritionProfile        NutritionProfile?
+  mealPlans               MealPlan[]
+  shoppingLists           ShoppingList[]
+  nutritionDayLogs        NutritionDayLog[]
+  mealPhotoScans          MealPhotoScan[]
+  mealIntakeLogs          MealIntakeLog[]
+  assistantThreads        AssistantThread[]
+  assistantUserMemory     AssistantUserMemory?
+  privacySettings         PrivacySettings?
+  consentRecords          ConsentRecord[]
+  exportEvents            ExportEvent[]
+  deletionRequest         DeletionRequest?
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model OAuthAccount {
+  id             String  @id @default(cuid())
+  userId         String
+  provider       String
+  providerUserId String
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model EmailChangeToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newEmail  String
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([newEmail])
+}
+
+model HealthProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  age    Int?
+  gender String?
+
+  heightCm Decimal? @db.Decimal(8, 2)
+  weightKg Decimal? @db.Decimal(9, 3)
+  targetWeightKg Decimal? @db.Decimal(9, 3)
+
+  occupationType String?
+  activityLevel  String?
+
+  dietaryPreferences  Json?
+  dietaryRestrictions Json?
+
+  fitnessGoalPrimary   String?
+  desiredActivityLevel String?
+
+  weeklyActivityDays    Int?
+  exerciseTypes         Json?
+  sessionDurationBand   String?
+  fitnessSelfLevel      String?
+  exerciseEnvironment   String?
+  exerciseTimeOfDay     String?
+  enduranceMinutes      Int?
+  pushupsMax            Int?
+  squatsMax             Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HealthMetricSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordedAt DateTime @default(now())
+
+  weightKg           Decimal? @db.Decimal(9, 3)
+  heightCm           Decimal? @db.Decimal(8, 2)
+  weeklyActivityDays Int?
+
+  wellnessScore Int?
+  bmi           Decimal? @db.Decimal(6, 2)
+
+  source String @default("user")
+
+  @@index([userId, recordedAt])
+  @@unique([userId, recordedAt])
+}
+
+model ActivityLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityType    String
+  activityAt      DateTime
+  durationMinutes Int
+  notes           String?
+  source          String   @default("user")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, activityAt])
+}
+
+model AIInsight {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      String
+  model         String
+  promptVersion String
+  status        String
+  degraded      Boolean  @default(false)
+  summary       String
+  recommendations Json
+  contextJson   Json
+  rawResponse   Json?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model PrivacySettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allowAiProcessing     Boolean  @default(true)
+  publicProfileVisible  Boolean  @default(false)
+  shareAnonymizedData   Boolean  @default(false)
+  emailNotifications    Boolean  @default(true)
+  insightCadence        String   @default("off")
+  weightReminderEnabled Boolean  @default(true)
+  activityReminderEnabled Boolean @default(true)
+  reminderChannel      String   @default("in_app")
+  activityReminderCadence String @default("daily")
+  lastAutoInsightAt     DateTime?
+  lastWeightReminderAt  DateTime?
+  lastActivityReminderAt DateTime?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+}
+
+model ConsentRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType String
+  granted     Boolean
+  source      String
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ExportEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  format       String
+  itemCount    Int
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DeletionRequest {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason         String?
+  status         String
+  requestedAt    DateTime @default(now())
+  scheduledFor   DateTime
+  cancelledAt    DateTime?
+  processedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model NutritionProfile {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timezone              String    @default("UTC")
+  dislikedIngredients   Json      @default("[]")
+  cuisinePreferences    Json      @default("[]")
+  calorieTarget         Int?
+  calorieTargetSource   String?
+  macroTargets          Json?
+  mealsPerDay           Int       @default(3)
+  snacksPerDay          Int       @default(0)
+  preferredMealTimes    Json?
+  nutritionConfirmedAt  DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Ingredient {
+  id        String   @id
+  label     String
+  unit      String   @default("gram")
+  quantity  Int      @default(100)
+  nutrition Json
+  embedding Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipeLinks RecipeIngredient[]
+  @@index([label])
+}
+
+model Recipe {
+  id              String   @id
+  title           String
+  cuisine         String
+  meal            String
+  servings        Int
+  summary         String
+  timeMinutes     Int
+  difficultyLevel String
+  dietaryTags     Json
+  source          String
+  img             String?
+  preparation     Json
+  embedding       Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  ingredients RecipeIngredient[]
+  plannedMeals PlannedMeal[]
+
+  @@index([cuisine])
+  @@index([meal])
+  @@index([title])
+}
+
+model RecipeIngredient {
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  name         String
+  quantity     Float
+
+  @@id([recipeId, ingredientId])
+}
+
+model MealPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  String
+  startDate String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions MealPlanVersion[]
+
+  @@index([userId, startDate])
+}
+
+model MealPlanVersion {
+  id              String   @id @default(cuid())
+  mealPlanId      String
+  mealPlan        MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  versionLabel    String
+  versionNumber   Int
+  isActive        Boolean  @default(true)
+  generationSteps Json?
+  preferencesSnapshot Json?
+  createdAt       DateTime @default(now())
+
+  meals         PlannedMeal[]
+  shoppingLists ShoppingList[]
+
+  @@index([mealPlanId, versionNumber])
+}
+
+model PlannedMeal {
+  id            String          @id @default(cuid())
+  versionId     String
+  version       MealPlanVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  dayIndex      Int             @default(0)
+  mealType      String
+  scheduledAt   DateTime
+  title         String
+  recipeId      String?
+  recipe        Recipe?         @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  nutrition     Json
+  alternatives  Json?
+  isManual      Boolean         @default(false)
+  sortOrder     Int             @default(0)
+  eatenAt       DateTime?
+
+  @@index([versionId, dayIndex, sortOrder])
+  @@index([versionId, dayIndex, eatenAt])
+}
+
+model ShoppingList {
+  id                  String           @id @default(cuid())
+  userId              String
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlanVersionId   String?
+  mealPlanVersion     MealPlanVersion? @relation(fields: [mealPlanVersionId], references: [id], onDelete: SetNull)
+  title               String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  items ShoppingListItem[]
+
+  @@index([userId, createdAt])
+}
+
+model ShoppingListItem {
+  id             String       @id @default(cuid())
+  shoppingListId String
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  ingredientId   String?
+  name           String
+  category       String
+  quantityGrams  Float?
+  quantityMl     Float?
+  excluded       Boolean      @default(false)
+
+  @@index([shoppingListId])
+}
+
+model NutritionDayLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  calories  Int      @default(0)
+  protein   Float    @default(0)
+  carbs     Float    @default(0)
+  fats      Float    @default(0)
+  source    String   @default("planned")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, source])
+  @@index([userId, date])
+}
+
+/// Phase 3 AI wingman — bootstrap tables; chat logic lives behind ASSISTANT_ENABLED.
+model AssistantThread {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String?
+  summary      String?  @db.Text
+  /// balanced | nutrition | wellness
+  coachingMode String   @default("balanced")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages AssistantMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model AssistantMessage {
+  id         String          @id @default(cuid())
+  threadId   String
+  thread     AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role       String
+  content    String          @db.Text
+  uiBlocks   Json?
+  toolTraces Json?
+  createdAt  DateTime        @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+/// Gemini vision analysis (foods only); calories come from ingredient DB on confirm.
+model MealPhotoScan {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String   /// analyzed | confirmed | failed
+  date           String
+  mealType       String?
+  description    String?
+  foods          Json     @default("[]")
+  nutrition      Json?
+  unmatchedFoods Json?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  intakeLog MealIntakeLog?
+
+  @@index([userId, createdAt])
+}
+
+/// Confirmed intake from photo (or future manual entry) — summed in daily analytics.
+model MealIntakeLog {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scanId    String?        @unique
+  scan      MealPhotoScan? @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  date      String
+  mealType  String?
+  title     String
+  nutrition Json
+  source    String         @default("photo")
+  eatenAt   DateTime       @default(now())
+  createdAt DateTime       @default(now())
+
+  @@index([userId, date])
+}
+
+/// Cross-session wingman memory (preferences, goals, habits) — not thread-local.
+model AssistantUserMemory {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  narrative String?  @db.Text
+  facts     Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

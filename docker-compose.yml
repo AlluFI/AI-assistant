@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: numbers
+    ports:
+      # 15432 on the host avoids clashing with local Postgres (5432) and other Docker stacks (5433).
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d numbers"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      # Avoid common host conflicts on macOS (port 1025 is often already in use).
+      # Inside the Docker network, Mailpit still listens on 1025; the API uses MAIL_HOST=mailpit + MAIL_PORT=1025.
+      - "10250:1025"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/numbers?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: dev_jwt_access_secret_change_me_32chars
+      JWT_REFRESH_SECRET: dev_refresh_secret_must_be_32_chars_min_len
+      JWT_ACCESS_EXPIRES_SEC: "900"
+      JWT_REFRESH_EXPIRES_SEC: "604800"
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_FROM: Numbers Dont Lie <no-reply@localhost>
+      WEB_APP_URL: http://localhost:8080
+      OAUTH_CALLBACK_BASE: http://localhost:3000/api/auth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-gemini-2.0-flash}
+      MEAL_PHOTO_MAX_BYTES: ${MEAL_PHOTO_MAX_BYTES:-5242880}
+      COOKIE_SECURE: "false"
+      AUTH_REFRESH_COOKIE_ONLY: "false"
+      DELETE_RETENTION_DAYS: "30"
+      PURGE_ADMIN_SECRET: ${PURGE_ADMIN_SECRET:-change_me_for_admin_purge}
+      PORT: "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_DEV_TOOLS: ${VITE_DEV_TOOLS:-false}
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
