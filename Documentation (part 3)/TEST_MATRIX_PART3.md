@@ -13,6 +13,7 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 | `GET` | `/api/health` | No | `{ status: "ok" }` |
 | `GET` | `/api/assistant/bootstrap` | No | Providers, DB tables, checklist |
 | — | `pnpm phase3:bootstrap` | — | Offline env check |
+| — | `pnpm wingman:eval` | — | 14 routing heuristics (offline) |
 
 ---
 
@@ -24,9 +25,13 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 | `POST` | `/api/assistant/threads` | `{ "title"?: string }` | `{ id, createdAt, … }` |
 | `GET` | `/api/assistant/threads` | — | List with `preview` |
 | `GET` | `/api/assistant/threads/:id` | — | Thread + `messages[]` |
+| `PATCH` | `/api/assistant/threads/:id` | `{ coachingMode?, title? }` | Updated thread |
 | `DELETE` | `/api/assistant/threads/:id` | — | `{ ok: true }` |
-| `POST` | `/api/assistant/threads/:id/messages` | `{ "content": string }` | Assistant message + optional `uiBlocks` |
+| `POST` | `/api/assistant/threads/:id/messages` | `{ "content": string }` | Assistant message + optional `uiBlocks`, `toolTraces` |
+| `POST` | `/api/assistant/threads/:id/messages/stream` | `{ "content": string }` | SSE token stream (when `ASSISTANT_STREAMING=true`) |
 | `POST` | `/api/assistant/actions/confirm` | See below | Executes confirmed action |
+| `GET` | `/api/assistant/memory` | — | User memory narrative + facts |
+| `DELETE` | `/api/assistant/memory` | — | Clears cross-session memory |
 
 **Confirm body examples**
 
@@ -50,25 +55,40 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 
 ---
 
-## 3) UI smoke — floating wingman
+## 3) Meal photos API (JWT, optional `GEMINI_API_KEY`)
 
-Prereq: signed in, `ASSISTANT_ENABLED` not `false`, migrations applied.
+| Method | Path | Notes |
+|--------|------|--------|
+| `POST` | `/api/meal-photos/analyze?date=&mealType=` | `multipart/form-data` field `image` |
+| `GET` | `/api/meal-photos/:scanId` | Scan + nutrition preview |
+| `POST` | `/api/meal-photos/:scanId/confirm` | Creates `MealIntakeLog` |
+| `GET` | `/api/meal-photos` | Recent scans |
+
+See [docs/MEAL_PHOTOS.md](../../docs/MEAL_PHOTOS.md).
+
+---
+
+## 4) UI smoke — floating wingman
+
+Prereq: signed in, `ASSISTANT_ENABLED` not `false`, migrations applied, LLM key in Compose `.env`.
 
 | Step | Action | Pass criteria |
 |------|--------|----------------|
 | 1 | Open app | Chat FAB bottom-right visible |
 | 2 | Click FAB | Panel opens; welcome/nudge text |
 | 3 | Reminder dot | Shows when weight/activity due (same rules as Overview banners) |
-| 4 | Send `record 1 hour tennis for today` | Confirm CTA; no DB write until confirm |
-| 5 | Tap Confirm | Success message; activity in Record tab |
-| 6 | Send `record weight 75 kg` | Confirm CTA → metric saved |
-| 7 | Tap "Open Record tab" | Navigates to Record view |
-| 8 | Empty send | No crash; button disabled or server 400 |
-| 9 | Close panel, reopen | *(Target)* history persists — verify thread reload when implemented |
+| 4 | Send `What's my current BMI?` | Answer uses plausible data from demo profile |
+| 5 | Send `record 1 hour tennis for today` | Confirm CTA; no DB write until confirm |
+| 6 | Tap Confirm | Success message; activity in Record tab |
+| 7 | Send `record weight 75 kg` | Confirm CTA → metric saved |
+| 8 | Tap "Open Record tab" | Navigates to Record view |
+| 9 | Empty send | No crash; button disabled or API 400 |
+| 10 | Close panel, reopen | Same thread; messages reload from API |
+| 11 | Enable streaming (`VITE_ASSISTANT_STREAMING=true` build) | Tokens appear incrementally |
 
 ---
 
-## 4) Conversation types (manual prompts)
+## 5) Conversation types (manual prompts)
 
 Test each; mark pass when answer uses **real data** (not invented numbers).
 
@@ -88,43 +108,47 @@ Test each; mark pass when answer uses **real data** (not invented numbers).
 
 ---
 
-## 5) Integration with Parts 1–2 (same session)
+## 6) Integration with Parts 1–2 (same session)
 
 | Step | Check |
 |------|--------|
 | 1 | Log weight in Record tab → ask wingman about weight → matches |
 | 2 | Generate meal plan in Nutrition → ask "meal plan today" → matches |
 | 3 | Overview charts trend → ask "describe my weight trend" → aligns with chart |
+| 4 | Confirm meal photo intake → daily nutrition totals update |
 
 ---
 
-## 6) Function calling (when implemented)
+## 7) Function calling
 
 | Test | Method |
 |------|--------|
-| Invalid enum | `metric_type: "invalid"` → validation error before DB |
-| Missing required | Omit `metric_type` → model or API rejects |
+| Invalid enum | Bad `metric_type` → tool error in trace, no crash |
+| Missing required | Omit `recipe_id` on `get_recipe` → model/API handles |
 | Swagger / traces | `toolTraces` on assistant message after turn |
 | Dual domain | Same thread: BMI + protein question → both tools called |
 
 ---
 
-## 7) Docker reviewer path
-
-```bash
-pnpm compose:up --build
-docker compose exec api sh -lc "cd /repo/apps/api && pnpm nutrition:seed && pnpm demo:seed"
-# Web :8080 — demo@numbers.local / DemoPassword123!
-```
-
----
-
-## 8) Extra — charts (when implemented)
+## 8) Charts (extra)
 
 | Prompt | Chart |
 |--------|--------|
-| Show my weight trend for the last month | Line |
-| Show how my protein compares to target | Bar |
-| Show macronutrient breakdown for today | Pie |
+| Show my weight trend for the last month | Line (`weight_trend`) |
+| Show how my protein compares to target | Bar (`protein_vs_target`) |
+| Show macronutrient breakdown for today | Pie (`macro_breakdown`) |
 
-Verify `ui_blocks` in API response renders in chat panel.
+Verify `ui_blocks` in API response renders in chat panel (`WingmanChart.tsx`).
+
+---
+
+## 9) Docker reviewer path
+
+```bash
+cp .env.example .env
+# Edit .env: ANTHROPIC_API_KEY (and optional GEMINI_API_KEY)
+
+pnpm compose:up --build
+docker compose exec api sh -lc "cd /repo/apps/api && pnpm exec prisma migrate deploy && pnpm nutrition:seed && pnpm demo:seed"
+# Web :8080 — demo@numbers.local / DemoPassword123!
+```

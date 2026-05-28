@@ -18,11 +18,12 @@ COPY apps/web/eslint.config.js apps/web/eslint.config.js
 
 ARG VITE_API_BASE=/api
 ARG VITE_DEV_TOOLS=false
+ARG VITE_ASSISTANT_STREAMING=true
 
 RUN pnpm install --frozen-lockfile --filter web...
 
 WORKDIR /repo/apps/web
-RUN printf 'VITE_API_BASE=%s\nVITE_DEV_TOOLS=%s\n' "$VITE_API_BASE" "$VITE_DEV_TOOLS" > .env.production
+RUN printf 'VITE_API_BASE=%s\nVITE_DEV_TOOLS=%s\nVITE_ASSISTANT_STREAMING=%s\n' "$VITE_API_BASE" "$VITE_DEV_TOOLS" "$VITE_ASSISTANT_STREAMING" > .env.production
 RUN pnpm run build
 
 FROM nginx:1.27-alpine

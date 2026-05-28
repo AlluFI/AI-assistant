@@ -17,7 +17,7 @@
 ## Phase 2 — Charts & memory
 
 - [x] `ui_blocks` chart rendering in web (line, bar, pie)
-- [x] Rolling thread summaries (rule-based)
+- [x] Rolling thread summaries (rule + LLM)
 - [x] Suggested starter prompts
 - [x] Link to Record / Nutrition / Insights via CTAs
 
@@ -35,15 +35,22 @@
 - [x] Eval golden set + `pnpm wingman:eval` (see `docs/WINGMAN_EVAL.md`)
 - [x] Provider abstraction (`WingmanLlmFacade`)
 
+## Phase 5 — Bonus (shipped)
+
+- [x] Cross-session memory (`AssistantUserMemory`, `docs/LONG_TERM_MEMORY.md`)
+- [x] Gemini meal photos (`apps/api/src/meal-photos`, `docs/MEAL_PHOTOS.md`)
+- [x] Requirements compliance doc (`Documentation (part 3)/IMPLEMENTATION_STATUS.md`)
+
 ## Open questions
 
 1. ~~Separate deployable vs monorepo~~ → **monorepo** for review
 2. ~~Is streaming required for review demo?~~ → implemented (can disable via env)
-3. ~~Cross-session memory~~ → **global `AssistantUserMemory`** (see `docs/LONG_TERM_MEMORY.md`)
-4. Estonian / Finnish language support?
+3. ~~Cross-session memory~~ → **global `AssistantUserMemory`**
+4. ~~Meal photo vision~~ → **Gemini + confirmed DB nutrition**
+5. Estonian / Finnish language support?
 
 ## Success metrics
 
-- ≥95% tool calls return valid args on golden set (offline routing heuristics)
-- Zero hallucinated calorie numbers in eval (spot-check)
-- p95 response &lt; 8s without streaming (tools + one LLM round)
+- ≥95% tool calls return valid args on golden set — **14/14 offline** (`pnpm wingman:eval`)
+- Zero hallucinated calorie numbers in eval (spot-check + meal-photo DB path)
+- p95 response &lt; 8s without streaming (tools + one LLM round) — verify in demo environment

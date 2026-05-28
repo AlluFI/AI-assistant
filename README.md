@@ -225,9 +225,13 @@ Parts 1–2 use **OpenAI** (`OPENAI_API_KEY`). Part 3 wingman targets **Anthropi
 - `SECURITY_AND_AI_DECISIONS.md` — AI/security talking points
 - `Documentation (part 1 & 2)/OPERATIONS_SECURITY.md` — ops verification
 
+## Part 3 compliance
+
+Before review, walk through [Documentation (part 3)/REQUIREMENTS_QUICKCHECK.md](Documentation%20(part%203)/REQUIREMENTS_QUICKCHECK.md) and [Documentation (part 3)/IMPLEMENTATION_STATUS.md](Documentation%20(part%203)/IMPLEMENTATION_STATUS.md). For a Part 2–style mandatory criteria map, copy and maintain local `Documentation (part 3)/COMPLIANCE_REPORT.md` (gitignored). Offline: `pnpm wingman:eval` (14 routing checks).
+
 ## Next steps (roadmap)
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for Phase 3 delivery (chat UI, tool loop, Anthropic, `ui_blocks`).
+See [docs/ROADMAP.md](docs/ROADMAP.md). Phase 3 core delivery is complete; remaining items are optional hardening and localization.
 
 - Optional production hardening: enforce cookie-only refresh mode and stricter origin policy
 - Add automated scheduled purge job (cron/worker) instead of manual purge endpoint

@@ -2,7 +2,7 @@
 
 Reference document for reviewers and self-checks. Mirrors the structure of [Part 1 & 2 requirements](../Documentation%20(part%201%20&%202)/PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md).
 
-**Related docs:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md) · [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md) · [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)
+**Related docs:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md) · [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md) · [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) · local `COMPLIANCE_REPORT.md` (gitignored; Part 2–style audit)
 
 ---
 
@@ -243,7 +243,9 @@ Plus **proactive** chart suggestions in conversation context.
 
 Optional; must not break default behaviour. Use feature flags or separate builds if needed.
 
-Examples: streaming tokens, meal-photo vision (Gemini), proactive weekly check-in, advanced eval harness.
+Examples: streaming tokens, meal-photo vision (Gemini), proactive weekly check-in, advanced eval harness, cross-session user memory.
+
+**Implemented in this repo (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for a full map of mandatory vs extra vs bonus criteria.
 
 ---
 

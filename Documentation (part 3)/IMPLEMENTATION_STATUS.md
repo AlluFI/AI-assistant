@@ -1,34 +1,230 @@
 # Part 3 — Implementation status vs requirements
 
-Legend: ✅ Done · 🟡 Partial · ⬜ Not started
+**Audit date:** 2026-05-28  
+**Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
+**Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
+**Offline check:** `pnpm wingman:eval` → **14/14** routing heuristics pass (does not replace live LLM demo).
 
-| Area | Requirement | Status | Where |
-|------|-------------|--------|--------|
-| **Docs** | Requirements + testing criteria | ✅ | `Documentation (part 3)/` |
-| **Docs** | Prompt + few-shots | ✅ | `docs/PROMPT_EXAMPLES.md`, `PROMPT_ENGINEERING.md` |
-| **UI** | Floating chat + persisted history | ✅ | `apps/web/src/wingman/` |
-| **UI** | Charts in chat (line / bar / pie) | ✅ | `WingmanChart.tsx` + `ui_blocks` |
-| **UI** | Streaming replies (SSE) | ✅ | `VITE_ASSISTANT_STREAMING` |
-| **UI** | Starter prompts (mode-aware) | ✅ | `WingmanChat` + `coachingMode` |
-| **UI** | Tab CTAs (Record, Nutrition, Insights) | ✅ | `open_*` actions |
-| **UI** | Coaching mode toggle | ✅ | Balanced / Nutrition / Wellness |
-| **API** | 7 data tools + validation | ✅ | + `search_recipes` |
-| **API** | LLM tool loop (OpenAI / Anthropic) | ✅ | `WingmanLlmFacade` |
-| **API** | SSE stream endpoint | ✅ | `POST .../messages/stream` |
-| **API** | LLM thread summary | ✅ | `ThreadSummaryService` |
-| **API** | Confirm actions (log, meal, shopping) | ✅ | Confirm endpoint |
-| **API** | Golden eval set | ✅ | `pnpm wingman:eval` |
-| **API** | Long-term cross-session memory | ✅ | `AssistantUserMemory`, `docs/LONG_TERM_MEMORY.md` |
-| **API** | Medical / PII guardrails | 🟡 | Keywords + prompt |
+Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not started
 
-## Env (reviewer)
+---
+
+## Summary
+
+| Category | Status |
+|----------|--------|
+| Mandatory — conversation layer | ✅ |
+| Mandatory — data access (≥4 tools, real APIs) | ✅ (8 read tools) |
+| Mandatory — system prompt & safety | ✅ |
+| Mandatory — documentation | ✅ |
+| Extra — Docker one-command | ✅ |
+| Extra — NL charts in chat | ✅ |
+| Extra — thread summarization (10+ turns) | ✅ (LLM + rule fallback) |
+| Bonus — streaming | ✅ |
+| Bonus — meal photo vision (Gemini) | ✅ |
+| Bonus — eval harness | ✅ |
+| Bonus — cross-session memory | ✅ |
+| Open | Estonian / Finnish UI |
+
+---
+
+## Functional requirements
+
+### Conversational experience
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| Follow-up questions | ✅ | Last 10 turns + thread summary in prompt; manual demo |
+| Context from earlier in thread | ✅ | `AssistantMessage` persistence; `GET .../threads/:id` |
+| Digestible formatting | ✅ | System prompt: bullets, bold metrics, modes |
+
+### Integration — health profile
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| BMI, weight, wellness, activity | ✅ | `get_health_metrics` → profile + analytics |
+| Goals and preferences | ✅ | `get_progress_summary`, profile snapshot in prompt |
+| Progress / activity history | ✅ | `get_progress_summary`, `get_chart_data` |
+| Personalized insights (multi-data) | 🟡 | LLM synthesis over tools; verify in demo |
+
+### Integration — nutrition
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| Meal plans | ✅ | `get_meal_plan` |
+| Recipes + steps | ✅ | `get_recipe`, `search_recipes` |
+| Intake vs targets | ✅ | `get_nutrition_summary` (+ photo intake in analytics) |
+| Dietary restrictions | 🟡 | Profile in prompt; verify wording in demo |
+
+### Data visualization
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| Describe trends | ✅ | `get_chart_data` + NL in reply |
+| Insights vs targets / history | ✅ | Tool JSON + coaching |
+| Charts in UI | ✅ | `ui_blocks` + `WingmanChart.tsx` |
+
+### Six conversation types + few-shots
+
+| Type | Status | Few-shots |
+|------|--------|-----------|
+| Health metrics | ✅ | `docs/PROMPT_EXAMPLES.md` §1 |
+| Progress | ✅ | §2 |
+| Meal plan | ✅ | §3 |
+| Recipe | ✅ | §4 |
+| Nutritional analysis | ✅ | §5 |
+| General wellness | ✅ | §6 + safety |
+
+### Multi-turn & response requirements
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| Follow-ups / reference resolution | 🟡 | Prompt + history; verify pronouns in demo |
+| Personalization (name, goals) | ✅ | Display name + tools + `AssistantUserMemory` |
+| Scannable structure | ✅ | System prompt formatting rules |
+| Medical boundaries | ✅ | Prompt + `MEDICAL_URGENT` rule + few-shot |
+| PII boundaries | ✅ | Prompt + keyword refusal for email/DOB/password |
+| Out-of-scope redirect | ✅ | System prompt § Out of scope |
+
+---
+
+## Architecture (two layers)
+
+| Layer | Status | Location |
+|-------|--------|----------|
+| Chat UI, history, streaming | ✅ | `apps/web/src/wingman/` |
+| Input validation (empty, max 8k) | ✅ | `PostAssistantMessageDto` |
+| Persist threads/messages | ✅ | Prisma `AssistantThread`, `AssistantMessage` |
+| Context (summary, profile, memory) | ✅ | `assistant-wingman.service.ts`, `UserMemoryService` |
+| LLM + tool loop | ✅ | `WingmanLlmFacade`, `assistant-tools.service.ts` |
+| JWT-scoped data access | ✅ | All tools use `userId` from JWT |
+| Structured errors (missing data) | ✅ | Tools return errors; prompt forbids inventing numbers |
+
+---
+
+## GenAI techniques
+
+### System prompt
+
+| Must include | Status |
+|--------------|--------|
+| Purpose, tone, domain terms | ✅ |
+| Ethical boundaries | ✅ |
+| Formatting rules | ✅ |
+| Personalization rules | ✅ |
+| Examples per category | ✅ `few-shot-snippet.ts` + `docs/PROMPT_EXAMPLES.md` |
+| Out-of-scope handling | ✅ |
+
+### Function calling (minimum 4)
+
+| Tool | Status | Backing |
+|------|--------|---------|
+| `get_health_metrics` | ✅ | Profile + analytics |
+| `get_progress_summary` | ✅ | Analytics |
+| `get_meal_plan` | ✅ | Meal plans |
+| `get_recipe` | ✅ | Recipes |
+| `get_nutrition_summary` | ✅ | Nutrition analytics |
+| `get_chart_data` | ✅ | Analytics series |
+| `search_recipes` | ✅ | Recipes + RAG (extra) |
+
+**Confirmed writes (UI only, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_create_shopping_list`.
+
+### Memory & context
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| ≥5 turns context | ✅ | 10 messages in prompt |
+| Key facts (goals, restrictions) | ✅ | `AssistantUserMemory` — `docs/LONG_TERM_MEMORY.md` |
+| Thread summary when long | ✅ | `ThreadSummaryService` at 12+ messages (`ASSISTANT_SUMMARY_MODE=llm`) |
+| Units kg, cm, kcal, g | ✅ | System prompt |
+| Concise vs detailed | ✅ | `ASSISTANT_RESPONSE_MODE` |
+
+### Model / token / errors
+
+| Topic | Status | Doc |
+|-------|--------|-----|
+| Model choice rationale | ✅ | `docs/STACK.md`, `docs/PROMPT_ENGINEERING.md` |
+| Temperature / top_p | ✅ | Documented (~0.4 / 0.95) |
+| Token windowing | ✅ | Summary + last N turns |
+| LLM outage fallback | 🟡 | Rule-based paths when provider unset; limited template fallback |
+| Boundaries messaging | ✅ | Bootstrap + disabled message |
+
+---
+
+## Extra requirements
+
+| Requirement | Status | Evidence |
+|---------------|--------|----------|
+| Docker one command | ✅ | `pnpm compose:up` |
+| NL → line / bar / pie charts | ✅ | `get_chart_data` enums + `chart-ui-blocks.util.ts` |
+| Proactive chart offer | ✅ | System prompt: "Would you like to see a chart?" |
+| History compression 10+ turns | ✅ | Summary at 12+ messages |
+| Dynamic context by topic | 🟡 | Coaching modes + summary; not a separate router |
+
+---
+
+## Bonus functionality
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Streaming (SSE) | ✅ | `POST .../messages/stream`, `VITE_ASSISTANT_STREAMING` |
+| Meal photo vision | ✅ | `apps/api/src/meal-photos/`, `docs/MEAL_PHOTOS.md` |
+| Weekly proactive nudge | ✅ | `GET /assistant/nudges` |
+| Eval harness | ✅ | `pnpm wingman:eval`, `docs/WINGMAN_EVAL.md` |
+| Cross-session memory | ✅ | `docs/LONG_TERM_MEMORY.md` |
+
+---
+
+## Mandatory testing criteria (quick map)
+
+| Criterion area | Ready for review? | Notes |
+|----------------|-------------------|-------|
+| README + design docs | ✅ | `README.md`, `docs/*` |
+| Health + nutrition via assistant | ✅ | Needs `ANTHROPIC_API_KEY` or OpenAI wingman provider |
+| Six conversation types | 🟡 | Verify live with demo user |
+| Multi-turn + PII + medical | ✅ | Rules + prompt; demo chest pain / email |
+| History persist close/reopen | ✅ | Thread list reloads from API |
+| Input validation | ✅ | `@MaxLength(8000)`, `@IsNotEmpty` |
+| ≥4 tools, ≥5 turns | ✅ | 8 tools; 10-turn window |
+| Jailbreak resistance | 🟡 | Prompt + auth scope; demo other-user prompts |
+| Student explains model choices | ✅ | Documented; prepare verbal summary |
+
+---
+
+## Deliverables checklist
+
+| Deliverable | Status |
+|-------------|--------|
+| Source + configuration | ✅ |
+| Architecture, setup, usage | ✅ `docs/ARCHITECTURE.md`, `REVIEWER_SETUP.md` |
+| Prompts + model choice | ✅ `PROMPT_ENGINEERING.md`, `PROMPT_EXAMPLES.md` |
+| Function calling + memory + errors | ✅ This file + linked docs |
+| Demo script | ✅ `REVIEW_CHECKLIST_PART3.md` |
+
+---
+
+## Env for reviewers
+
+Root `.env` (Compose) or `apps/api/.env` (local dev) — see `.env.example`.
 
 ```env
+ANTHROPIC_API_KEY=          # or OPENAI + ASSISTANT_LLM_PROVIDER=openai
+ASSISTANT_ENABLED=true
 ASSISTANT_STREAMING=true
 ASSISTANT_SUMMARY_MODE=llm
-VITE_ASSISTANT_STREAMING=true
+ASSISTANT_MEMORY_ENABLED=true
+GEMINI_API_KEY=             # optional — meal photos on Nutrition tab
 ```
 
-## Demo prompts
+Compose forwards AI keys from the repo root `.env` (see `docker-compose.yml`).
 
-See Phase 3 list in prior docs; add: ask a long question and watch tokens stream in the chat bubble.
+---
+
+## Gaps / honest notes
+
+1. **Live LLM quality** — Offline eval covers routing only; reviewers should run the demo script with keys set.
+2. **Docker without keys** — Wingman returns disabled/fallback messaging; Parts 1–2 still usable.
+3. **Medical guardrails** — Keyword rules + prompt; not a separate moderation API.
+4. **Localization** — English only (roadmap open item).
+
+*Update this file when behaviour changes.*

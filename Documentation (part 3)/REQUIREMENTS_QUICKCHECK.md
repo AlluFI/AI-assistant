@@ -1,9 +1,9 @@
 # Part 3 — Requirements quick check
 
 Fast pass/fail for reviewers and self-review before submission.  
-Mark `[x]` when verified; add evidence in **Notes**.
+Mark `[x]` when **verified in your environment** (live demo or test).  
+**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for what is already built in the repo.
 
-**Status overview:** [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)  
 **Detailed criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **API/UI steps:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md)
 
@@ -17,7 +17,8 @@ Mark `[x]` when verified; add evidence in **Notes**.
 - [ ] `pnpm verify` passes (or documented exceptions)
 - [ ] README covers full app (Parts 1–3) + wingman
 
-Notes:
+**Built in repo:** Compose stack, seeds, README Phase 3 section.  
+**Notes:** Put `ANTHROPIC_API_KEY` (or OpenAI wingman) in **repo root** `.env` for Docker; copy `.env.example` as template.
 
 ---
 
@@ -29,7 +30,7 @@ Notes:
 - [ ] Error handling methods
 - [ ] Function calling implementation details
 
-Notes:
+**Built in repo:** `docs/PROMPT_ENGINEERING.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/LONG_TERM_MEMORY.md`.
 
 ---
 
@@ -37,12 +38,12 @@ Notes:
 
 - [ ] Floating / accessible chat UI with message history
 - [ ] Multi-turn: ≥ 3 turns without losing messages in DB
-- [ ] Close and reopen chat — history continues *(target; verify)*
+- [ ] Close and reopen chat — history continues
 - [ ] Empty input handled gracefully
 - [ ] Very long / special character input handled
 - [ ] Malformed input does not corrupt thread state
 
-Notes:
+**Built in repo:** `WingmanChat.tsx`, Prisma threads, `@MaxLength(8000)` on content, empty blocked in UI/API.
 
 ---
 
@@ -56,7 +57,7 @@ Notes:
 - [ ] "What are my fitness goals?" → user-specific goals
 - [ ] Wellness improvement question uses score components
 
-Notes:
+**Built in repo:** `get_health_metrics`, `get_progress_summary`; PII/medical rules in `assistant-wingman.service.ts`.
 
 ---
 
@@ -67,7 +68,7 @@ Notes:
 - [ ] Protein/calories vs target for week/day
 - [ ] Dietary restrictions respected in recommendations
 
-Notes:
+**Built in repo:** `get_meal_plan`, `get_recipe`, `get_nutrition_summary`, `search_recipes`.
 
 ---
 
@@ -80,7 +81,7 @@ Notes:
 - [ ] Nutritional analysis
 - [ ] General wellness (with boundaries)
 
-Notes:
+**Built in repo:** Few-shots in `docs/PROMPT_EXAMPLES.md`; eval cases in `wingman-golden-set.json`.
 
 ---
 
@@ -92,7 +93,7 @@ Notes:
 - [ ] Medical escalation (e.g. chest pain when exercising)
 - [ ] Units: kg, cm, kcal, g throughout
 
-Notes:
+**Built in repo:** Formatting + safety in system prompt; medical keyword guard.
 
 ---
 
@@ -103,7 +104,7 @@ Notes:
 - [ ] Student can trace one message end-to-end
 - [ ] Auth required for all private data paths
 
-Notes:
+**Built in repo:** `toolTraces` on messages; JWT on all assistant routes.
 
 ---
 
@@ -117,7 +118,7 @@ Notes:
 - [ ] ≥ 5 turns context with follow-ups
 - [ ] Student explains model + temperature / top-p
 
-Notes:
+**Built in repo:** 8 read tools; `pnpm wingman:eval` 14/14; docs in `PROMPT_ENGINEERING.md`.
 
 ---
 
@@ -128,7 +129,7 @@ Notes:
 - [ ] Log activity via chat with **confirm** (e.g. 1 h tennis)
 - [ ] Log weight via chat with **confirm**
 
-Notes:
+**Built in repo:** `GET /assistant/nudges`, confirm actions endpoint.
 
 ---
 
@@ -144,7 +145,7 @@ Notes:
 - [ ] Graceful AI outage fallback
 - [ ] Bonus features documented
 
-Notes:
+**Built in repo:** Charts, summary at 12+ msgs, `IMPLEMENTATION_STATUS.md` bonus table; meal photos + streaming documented.
 
 ---
 
@@ -155,7 +156,7 @@ Notes:
 - [ ] Integration with Parts 1–2 explained
 - [ ] Challenges & tradeoffs discussed
 
-Notes:
+**Prep:** [REVIEW_CHECKLIST_PART3.md](./REVIEW_CHECKLIST_PART3.md), `docs/STACK.md`.
 
 ---
 
@@ -173,7 +174,7 @@ Notes:
 | H Data layer | | 4 |
 | I GenAI | | 7 |
 | J Actions | | 4 |
-| K Extra | | 8 |
+| K Extra | | 9 |
 | L Demo | | 4 |
 
-*Update totals if you add rows.*
+*Totals are for reviewer use — check boxes during your run-through.*

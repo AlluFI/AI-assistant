@@ -57,6 +57,7 @@ Three **frontier** models for “analyst / coach / wingman” usually adds cost 
 |------|----------|-----------|
 | 2026-05-28 | Parts 1–2 stay on OpenAI | Already in `apps/api` |
 | 2026-05-28 | Part 3 wingman → Anthropic | Coaching tone; separate from meal-plan JSON path |
-| 2026-05-28 | Meal photos → Gemini (later) | Vision-only task; calories via DB after user confirm |
+| 2026-05-28 | Meal photos → Gemini | Vision identifies foods; calories via ingredient DB after user confirm |
 | 2026-05-28 | Single submission repo | Full app copied from counting-calories; Part 3 built here |
-| TBD | Streaming vs full response | |
+| 2026-05-28 | Streaming SSE for wingman | Optional via `ASSISTANT_STREAMING` / `VITE_ASSISTANT_STREAMING` |
+| 2026-05-28 | Cross-session memory | `AssistantUserMemory` + LLM merge throttle |

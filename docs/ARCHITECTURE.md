@@ -45,24 +45,26 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 
 | Type | Storage | Used for |
 |------|---------|----------|
-| Working | Last 10–20 messages in prompt | Exact follow-ups |
-| Thread summary | `assistant_thread.summary` updated every K turns | Long conversations |
-| Authoritative facts | Profile + latest analytics snapshot injected each turn | Goals, restrictions, targets |
-| Semantic (v2) | Embeddings over insight history | “Remember when I…” |
+| Working | Last 10 messages in prompt | Exact follow-ups |
+| Thread summary | `AssistantThread.summary` (LLM or rule, 12+ messages) | Long conversations |
+| Authoritative facts | Profile snapshot injected each turn | Goals, restrictions, targets |
+| Cross-session | `AssistantUserMemory` (narrative + facts JSON) | Preferences across threads — see [LONG_TERM_MEMORY.md](./LONG_TERM_MEMORY.md) |
 
-**Rule:** Summaries are narrative only; metrics must be re-fetched via tools each turn if needed.
+**Rule:** Summaries and memory are narrative only; metrics must be re-fetched via tools each turn if needed.
 
-## Tool catalog (initial)
+## Tool catalog (shipped)
 
 | Tool | Source | Example question |
 |------|--------|------------------|
-| `get_daily_nutrition` | nutrition-analytics | “How did I do yesterday?” |
-| `get_weekly_summary` | nutrition-analytics | “Summarize my week” |
-| `get_trend` | nutrition-analytics | “Show my calorie trend” |
-| `get_wellness_snapshot` | profile + metrics | “How’s my weight trend?” |
-| `get_active_meal_plan` | meal-plans | “What’s for dinner today?” |
+| `get_health_metrics` | profile + analytics | “What’s my BMI?” |
+| `get_progress_summary` | analytics | “How close to my goal?” |
+| `get_meal_plan` | meal-plans | “What’s for dinner today?” |
+| `get_recipe` | recipes | “How do I prepare tonight’s meal?” |
+| `get_nutrition_summary` | nutrition-analytics | “Calories today vs target?” |
 | `search_recipes` | recipes + RAG | “High protein lunch ideas” |
-| `get_chart_data` | wraps analytics | Returns series for UI chart block |
+| `get_chart_data` | analytics | “Show my weight trend” → `ui_blocks` chart |
+
+**Meal photos (bonus):** Gemini vision → `MealPhotoScan` → user confirm → `MealIntakeLog` → analytics ([MEAL_PHOTOS.md](./MEAL_PHOTOS.md)).
 
 Actions that **mutate** data (regenerate plan, log meal) require **explicit user confirmation** in UI, not silent tool execution.
 

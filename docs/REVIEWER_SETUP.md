@@ -7,8 +7,9 @@ This repository contains **everything** needed to run and review the project. Yo
 ```bash
 git clone <this-repo-url>
 cd ai-assistant
-cp .env.example apps/api/.env
-# Edit apps/api/.env: JWT secrets (32+ chars), optional OPENAI_API_KEY / ANTHROPIC_API_KEY
+cp .env.example .env
+# Edit .env: optional OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, ASSISTANT_*
+# For local API dev (non-Docker), also: cp .env.example apps/api/.env
 
 pnpm install
 pnpm compose:up --build
