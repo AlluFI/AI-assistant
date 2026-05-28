@@ -13,6 +13,7 @@ import type {
   MealPhotoScanResult,
 } from './meal-photo.types';
 
+/** Meal photo scans and confirmed intake logs; macros come from the nutrition DB, not Gemini. */
 @Injectable()
 export class MealPhotosService {
   constructor(
@@ -42,7 +43,7 @@ export class MealPhotosService {
       description = detected.description;
       foods = detected.items;
     } catch (e) {
-      const row = await this.prisma.mealPhotoScan.create({
+      await this.prisma.mealPhotoScan.create({
         data: {
           userId,
           status: 'failed',
@@ -88,10 +89,7 @@ export class MealPhotosService {
     const unmatched = Array.isArray(row.unmatchedFoods)
       ? (row.unmatchedFoods as string[])
       : [];
-    return this.toResult(
-      row,
-      foods.length - unmatched.length,
-    );
+    return this.toResult(row, foods.length - unmatched.length);
   }
 
   async confirm(userId: string, scanId: string) {

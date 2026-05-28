@@ -5,6 +5,7 @@ import { ProfileService } from '../profile/profile.service';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { RecipesService } from '../recipes/recipes.service';
 
+/** Executes wingman tool calls against existing Nest services (JWT-scoped userId). */
 @Injectable()
 export class AssistantToolsService {
   constructor(

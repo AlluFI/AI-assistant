@@ -47,7 +47,7 @@ export class AssistantService {
     return this.userMemory.clearForUser(userId);
   }
 
-  /** Full wingman chat (rule-based for now; Anthropic when configured later). */
+  /** Whether wingman chat is enabled (`ASSISTANT_ENABLED` !== `false`). */
   chatEnabled(): boolean {
     const flag = this.config.get<string>('ASSISTANT_ENABLED');
     return flag !== 'false';
@@ -568,17 +568,17 @@ export class AssistantService {
       },
       {
         id: 'assistant-thread-crud',
-        title: 'Thread CRUD (no LLM replies yet)',
+        title: 'Thread CRUD + persisted messages',
         owner: 'code' as const,
-        status: assistantTables ? ('stub' as const) : ('todo' as const),
+        status: assistantTables ? ('done' as const) : ('todo' as const),
       },
       {
         id: 'anthropic-wingman',
-        title: 'Wingman LLM + tool loop (7 tools)',
+        title: 'Wingman LLM + tool loop (8 read tools)',
         owner: 'both' as const,
         status:
-          anthropicConfigured || Boolean(this.openai.apiKey)
-            ? ('stub' as const)
+          anthropicConfigured || this.openai.apiKey
+            ? ('done' as const)
             : ('todo' as const),
         notes:
           'ANTHROPIC_API_KEY or OPENAI_API_KEY; see docs/PROMPT_EXAMPLES.md',
@@ -587,7 +587,7 @@ export class AssistantService {
         id: 'gemini-meal-photo',
         title: 'Gemini vision → structured foods → DB calories',
         owner: 'code' as const,
-        status: Boolean(this.config.get<string>('GEMINI_API_KEY')?.trim())
+        status: this.config.get<string>('GEMINI_API_KEY')?.trim()
           ? ('done' as const)
           : ('todo' as const),
         notes: 'POST /api/meal-photos/analyze + confirm',
@@ -596,7 +596,7 @@ export class AssistantService {
         id: 'assistant-ui',
         title: 'Chat panel + chart ui_blocks in web',
         owner: 'code' as const,
-        status: 'stub' as const,
+        status: 'done' as const,
       },
       {
         id: 'design-docs',

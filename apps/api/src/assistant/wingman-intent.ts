@@ -118,10 +118,6 @@ export function parseLogWeightIntent(text: string): ParsedWeightLog | null {
   };
 }
 
-export function isReminderAck(text: string): boolean {
-  return /\b(yes|yeah|sure|ok|okay|please|do it|go ahead)\b/i.test(text.trim());
-}
-
 export type ParsedRegenerateMeal = {
   mealType: string;
   mealTypeLabel: string;

@@ -8,6 +8,7 @@ import type { DetectedFoodItem } from './meal-photo.types';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+/** Gemini vision: food names and grams only (no calories in the model output). */
 @Injectable()
 export class GeminiVisionService {
   private readonly timeoutMs = 45_000;
@@ -53,7 +54,9 @@ export class GeminiVisionService {
       );
     }
 
-    const mealHint = hints?.mealType ? `Meal type hint: ${hints.mealType}.` : '';
+    const mealHint = hints?.mealType
+      ? `Meal type hint: ${hints.mealType}.`
+      : '';
     const prompt = `You are a meal photo analyst. Identify visible foods and estimate portion sizes in grams.
 ${mealHint}
 Return JSON only:

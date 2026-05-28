@@ -83,8 +83,6 @@ export class AssistantWingmanService {
       return result;
     };
 
-    const inferredChart = inferChartToolCall(userMessage);
-
     const result = await this.llm.chat({
       system: ctx.system,
       history: ctx.history,
@@ -92,15 +90,7 @@ export class AssistantWingmanService {
       executeTool,
     });
 
-    if (
-      inferredChart &&
-      !traceResults.some((t) => t.name === 'get_chart_data')
-    ) {
-      await executeTool('get_chart_data', {
-        chart_type: inferredChart.chart_type,
-        days: inferredChart.days ?? 30,
-      });
-    }
+    await this.applyInferredChartTool(userMessage, traceResults, executeTool);
 
     return this.packageLlmReply(userMessage, result.content, traceResults);
   }
@@ -148,7 +138,6 @@ export class AssistantWingmanService {
       return result;
     };
 
-    const inferredChart = inferChartToolCall(userMessage);
     let finalContent = '';
 
     for await (const event of this.llm.chatStream({
@@ -170,28 +159,11 @@ export class AssistantWingmanService {
       }
     }
 
-    if (
-      inferredChart &&
-      !traceResults.some((t) => t.name === 'get_chart_data')
-    ) {
-      yield {
-        type: 'tool_start',
-        name: 'get_chart_data',
-        args: {
-          chart_type: inferredChart.chart_type,
-          days: inferredChart.days ?? 30,
-        },
-      };
-      const result = await executeTool('get_chart_data', {
-        chart_type: inferredChart.chart_type,
-        days: inferredChart.days ?? 30,
-      });
-      yield {
-        type: 'tool_end',
-        name: 'get_chart_data',
-        resultSummary: JSON.stringify(result).slice(0, 500),
-      };
-    }
+    yield* this.applyInferredChartToolStream(
+      userMessage,
+      traceResults,
+      executeTool,
+    );
 
     const packaged = this.packageLlmReply(
       userMessage,
@@ -431,6 +403,56 @@ export class AssistantWingmanService {
     }
 
     return null;
+  }
+
+  /** When the user asks for a chart but the model skips `get_chart_data`. */
+  private async applyInferredChartTool(
+    userMessage: string,
+    traceResults: Array<{ name: string }>,
+    executeTool: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>,
+  ) {
+    const inferredChart = inferChartToolCall(userMessage);
+    if (
+      !inferredChart ||
+      traceResults.some((t) => t.name === 'get_chart_data')
+    ) {
+      return;
+    }
+    await executeTool('get_chart_data', {
+      chart_type: inferredChart.chart_type,
+      days: inferredChart.days ?? 30,
+    });
+  }
+
+  private async *applyInferredChartToolStream(
+    userMessage: string,
+    traceResults: Array<{ name: string }>,
+    executeTool: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>,
+  ): AsyncGenerator<WingmanStreamEvent> {
+    const inferredChart = inferChartToolCall(userMessage);
+    if (
+      !inferredChart ||
+      traceResults.some((t) => t.name === 'get_chart_data')
+    ) {
+      return;
+    }
+    const args = {
+      chart_type: inferredChart.chart_type,
+      days: inferredChart.days ?? 30,
+    };
+    yield { type: 'tool_start', name: 'get_chart_data', args };
+    const result = await executeTool('get_chart_data', args);
+    yield {
+      type: 'tool_end',
+      name: 'get_chart_data',
+      resultSummary: JSON.stringify(result).slice(0, 500),
+    };
   }
 
   private normalizeCoachingMode(
