@@ -5,6 +5,45 @@ export type MacroNutrition = {
   fats: number
 }
 
+export type AntioxidantProfile = {
+  polyphenols: 'low' | 'medium' | 'high'
+  flavonoids: 'low' | 'medium' | 'high'
+  carotenoids: 'low' | 'medium' | 'high'
+}
+
+export type EnvironmentalImpact = {
+  carbon_footprint: 'low' | 'medium' | 'high'
+  water_usage: 'low' | 'medium' | 'high'
+}
+
+export type EnhancedRecipeNutrition = {
+  glycemic_index: number
+  antioxidant_profile: AntioxidantProfile
+  nutrient_density_score: number
+  processing_level: string
+  environmental_impact: EnvironmentalImpact
+  satiety_index: number
+}
+
+export type EnhancedMealPlanAnalytics = {
+  nutritional_balance_score: number
+  diversity_index: number
+  micronutrient_coverage: {
+    percentage: number
+    deficiencies: string[]
+    excess: string[]
+  }
+  weekly_trends: {
+    protein_consistency: 'low' | 'medium' | 'high'
+    fiber_trend: 'increasing' | 'stable' | 'decreasing'
+    sugar_trend: 'increasing' | 'stable' | 'decreasing'
+  }
+  sustainability_metrics: {
+    plant_to_animal_ratio: number
+    seasonal_ingredient_percentage: number
+  }
+}
+
 export type DailyAnalytics = {
   date: string
   target: { calories: number; macros: { protein: number; carbs: number; fats: number } }
@@ -63,8 +102,9 @@ export type MealPlanVersionDetail = {
   isActive: boolean
   preferencesSnapshot?: { calorie_target?: number } | null
   generationSteps?: GenerationStepRecord[] | null
+  enhanced_analytics?: EnhancedMealPlanAnalytics | null
   meals: PlannedMealRow[]
-  mealPlan: { id: string; duration: string; startDate: string }
+  mealPlan?: { id: string; duration: string; startDate: string }
 }
 
 export type WeeklyAnalytics = {

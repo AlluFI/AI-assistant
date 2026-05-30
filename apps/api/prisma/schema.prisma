@@ -36,6 +36,7 @@ model User {
   mealIntakeLogs          MealIntakeLog[]
   assistantThreads        AssistantThread[]
   assistantUserMemory     AssistantUserMemory?
+  recipeFeedback          RecipeFeedback[]
   privacySettings         PrivacySettings?
   consentRecords          ConsentRecord[]
   exportEvents            ExportEvent[]
@@ -280,15 +281,44 @@ model Recipe {
   img             String?
   preparation     Json
   embedding       Json?
+  communityScore      Float?
+  communityRatingCount Int     @default(0)
+  verified            Boolean  @default(false)
+  communityRagText    String?
+  glycemicIndex           Int?
+  antioxidantProfile      Json?
+  nutrientDensityScore    Float?
+  processingLevel         String?
+  environmentalImpact     Json?
+  satietyIndex            Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   ingredients RecipeIngredient[]
   plannedMeals PlannedMeal[]
+  feedback    RecipeFeedback[]
 
   @@index([cuisine])
   @@index([meal])
   @@index([title])
+  @@index([verified, communityScore])
+}
+
+model RecipeFeedback {
+  id         String   @id @default(cuid())
+  recipeId   String
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating     Int
+  reviewText String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([recipeId, userId])
+  @@index([recipeId, status])
+  @@index([status, createdAt])
 }
 
 model RecipeIngredient {
@@ -325,6 +355,11 @@ model MealPlanVersion {
   isActive        Boolean  @default(true)
   generationSteps Json?
   preferencesSnapshot Json?
+  nutritionalBalanceScore Float?
+  diversityIndex          Float?
+  micronutrientCoverage   Json?
+  weeklyTrends            Json?
+  sustainabilityMetrics   Json?
   createdAt       DateTime @default(now())
 
   meals         PlannedMeal[]

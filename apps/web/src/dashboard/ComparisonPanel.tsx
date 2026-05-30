@@ -84,7 +84,7 @@ export function ComparisonPanel({
     : []
 
   return (
-    <section className="vizBlock comparisonPanel">
+    <section className="vizBlock comparisonPanel cardSpan2">
       <div className="vizBlockHead">
         <h3>Current vs target</h3>
       </div>

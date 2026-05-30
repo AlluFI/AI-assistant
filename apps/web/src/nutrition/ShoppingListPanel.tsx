@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsPDF } from 'jspdf'
+import { apiDelete, apiPatch } from '../lib/apiClient'
 import type { ShoppingList } from './types'
-
-const apiBase = import.meta.env.VITE_API_BASE ?? '/api'
 
 const CATEGORY_ORDER = [
   'produce',
@@ -124,14 +123,6 @@ export function ShoppingListPanel({
     }
   }, [isOpen, onClose])
 
-  const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }),
-    [accessToken],
-  )
-
   const activeList = lists.find((l) => l.id === selectedListId) ?? lists[0] ?? null
 
   const itemsByCategory = useMemo(() => {
@@ -164,14 +155,7 @@ export function ShoppingListPanel({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(
-        `${apiBase}/shopping-lists/${activeList.id}/items/${itemId}`,
-        { method: 'PATCH', headers, body: JSON.stringify(body) },
-      )
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as { message?: string }).message ?? 'Update failed')
-      }
+      await apiPatch(`/shopping-lists/${activeList.id}/items/${itemId}`, accessToken, body)
       await onRefreshLists()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update item')
@@ -186,11 +170,7 @@ export function ShoppingListPanel({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(
-        `${apiBase}/shopping-lists/${activeList.id}/items/${itemId}`,
-        { method: 'DELETE', headers },
-      )
-      if (!res.ok) throw new Error('Remove failed')
+      await apiDelete(`/shopping-lists/${activeList.id}/items/${itemId}`, accessToken)
       setMessage('Item removed')
       await onRefreshLists()
     } catch (e) {

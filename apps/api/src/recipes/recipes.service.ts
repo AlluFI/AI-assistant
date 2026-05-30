@@ -5,6 +5,11 @@ import { NutritionService } from '../nutrition/nutrition.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../rag/rag.service';
 import { NutritionToolsService } from '../nutrition-tools/nutrition-tools.service';
+import {
+  estimateMicronutrientsFromMacros,
+  type MicronutrientMap,
+} from '../shared/micronutrients';
+import { EnhancedNutritionService } from '../enhanced-nutrition/enhanced-nutrition.service';
 import { MacroNutrition } from '../shared/units';
 import { RecipeSearchDto } from './dto/recipe-search.dto';
 import { ScaleRecipeDto } from './dto/scale-recipe.dto';
@@ -18,12 +23,19 @@ export class RecipesService {
     private readonly nutritionTools: NutritionToolsService,
     private readonly nutrition: NutritionService,
     private readonly openai: OpenAiClientService,
+    private readonly enhancedNutrition: EnhancedNutritionService,
   ) {}
 
   async search(dto: RecipeSearchDto) {
     const q = dto.q?.trim() ?? '';
-    if (q) {
-      const retrieved = await this.rag.searchRecipes(q, {
+    const tagQuery = (dto.dietaryTags ?? [])
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .join(' ');
+    const effectiveQ = q || tagQuery;
+
+    if (effectiveQ) {
+      const retrieved = await this.rag.searchRecipes(effectiveQ, {
         limit: dto.limit ?? 20,
         cuisine: dto.cuisine,
         dietaryTags: dto.dietaryTags,
@@ -45,19 +57,63 @@ export class RecipesService {
           };
         })
         .filter((row): row is NonNullable<typeof row> => Boolean(row))
+        .filter((row) =>
+          this.hasAllDietaryTags(row.dietary_tags, dto.dietaryTags),
+        )
         .filter(
           (row) =>
             !this.matchesAnyAllergy(row.ingredients, dto.allergies ?? []),
         );
+      if (dto.meal) {
+        const meal = dto.meal.toLowerCase();
+        ranked.splice(
+          0,
+          ranked.length,
+          ...ranked.filter((row) => row.meal.toLowerCase() === meal),
+        );
+      }
+      if (dto.ingredient) {
+        const term = dto.ingredient.toLowerCase();
+        ranked.splice(
+          0,
+          ranked.length,
+          ...ranked.filter((row) =>
+            row.ingredients.some((i) => i.name.toLowerCase().includes(term)),
+          ),
+        );
+      }
       const withMacros = await Promise.all(
         ranked.map(async (row) => ({
           row,
           nutrition: await this.getPerServingNutrition(row.id),
         })),
       );
-      return withMacros
-        .filter(({ nutrition }) => this.passesMacroBounds(nutrition, dto))
-        .map(({ row, nutrition }) => ({ ...row, nutrition }));
+      const ragResults = withMacros
+        .filter(({ nutrition }) => this.passesNutritionFilters(nutrition, dto))
+        .map(({ row, nutrition }) => {
+          const recipe = byId.get(row.id);
+          return {
+            ...row,
+            nutrition,
+            enhanced_nutrition: recipe
+              ? this.enhancedNutrition.recipeEnhancedFields(recipe, nutrition)
+              : row.enhanced_nutrition,
+          };
+        });
+
+      return ragResults.sort(
+        (a, b) =>
+          this.communitySortScore({
+            verified: Boolean(b.verified),
+            communityScore: b.community_score ?? null,
+            communityRatingCount: b.community_rating_count ?? 0,
+          }) -
+          this.communitySortScore({
+            verified: Boolean(a.verified),
+            communityScore: a.community_score ?? null,
+            communityRatingCount: a.community_rating_count ?? 0,
+          }),
+      );
     }
 
     const where: Prisma.RecipeWhereInput = {};
@@ -72,24 +128,51 @@ export class RecipesService {
     }
     const recipes = await this.prisma.recipe.findMany({
       where,
-      take: Math.min(50, dto.limit ?? 20),
+      take: 500,
       include: { ingredients: true },
       orderBy: { title: 'asc' },
     });
     const filtered = recipes
-      .map((r) => this.serializeRecipe(r))
+      .filter((r) => this.hasAllDietaryTags(r.dietaryTags, dto.dietaryTags))
       .filter(
-        (row) => !this.matchesAnyAllergy(row.ingredients, dto.allergies ?? []),
-      );
+        (r) =>
+          !this.matchesAnyAllergy(
+            r.ingredients.map((i) => ({ name: i.name })),
+            dto.allergies ?? [],
+          ),
+      )
+      .slice(0, Math.min(50, dto.limit ?? 20));
     const withMacros = await Promise.all(
-      filtered.map(async (row) => ({
-        row,
-        nutrition: await this.getPerServingNutrition(row.id),
+      filtered.map(async (recipe) => ({
+        recipe,
+        row: this.serializeRecipe(recipe),
+        nutrition: await this.getPerServingNutrition(recipe.id),
       })),
     );
-    return withMacros
-      .filter(({ nutrition }) => this.passesMacroBounds(nutrition, dto))
-      .map(({ row, nutrition }) => ({ ...row, nutrition }));
+    const macroFiltered = withMacros
+      .filter(({ nutrition }) => this.passesNutritionFilters(nutrition, dto))
+      .map(({ row, recipe, nutrition }) => ({
+        ...row,
+        nutrition,
+        enhanced_nutrition: this.enhancedNutrition.recipeEnhancedFields(
+          recipe,
+          nutrition,
+        ),
+      }));
+
+    return macroFiltered.sort(
+      (a, b) =>
+        this.communitySortScore({
+          verified: Boolean(b.verified),
+          communityScore: b.community_score ?? null,
+          communityRatingCount: b.community_rating_count ?? 0,
+        }) -
+        this.communitySortScore({
+          verified: Boolean(a.verified),
+          communityScore: a.community_score ?? null,
+          communityRatingCount: a.community_rating_count ?? 0,
+        }),
+    );
   }
 
   async getById(id: string) {
@@ -103,10 +186,15 @@ export class RecipesService {
         id,
         recipe.servings,
       );
+    const serialized = this.serializeRecipe(recipe);
     return {
-      ...this.serializeRecipe(recipe),
+      ...serialized,
       nutrition: nutrition.perServing,
       nutritionTotal: nutrition.nutrition,
+      enhanced_nutrition: this.enhancedNutrition.recipeEnhancedFields(
+        recipe,
+        nutrition.perServing,
+      ),
     };
   }
 
@@ -273,7 +361,23 @@ export class RecipesService {
       source: recipe.source,
       img: recipe.img,
       preparation: recipe.preparation,
+      community_score: recipe.communityScore,
+      community_rating_count: recipe.communityRatingCount,
+      verified: recipe.verified,
+      enhanced_nutrition: this.enhancedNutrition.recipeEnhancedFields(recipe),
     };
+  }
+
+  private communitySortScore(recipe: {
+    verified: boolean;
+    communityScore: number | null;
+    communityRatingCount: number;
+  }): number {
+    let s = 0;
+    if (recipe.verified) s += 100;
+    if (recipe.communityScore != null) s += recipe.communityScore * 10;
+    s += Math.min(recipe.communityRatingCount, 20);
+    return s;
   }
 
   private async getPerServingNutrition(
@@ -287,11 +391,71 @@ export class RecipesService {
     return scaled.perServing;
   }
 
+  private normalizeDietaryTags(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((t) => String(t).trim().toLowerCase())
+      .filter((t) => t.length > 0);
+  }
+
+  /** Recipe must include every requested tag (AND). */
+  private hasAllDietaryTags(
+    raw: unknown,
+    required: string[] | undefined,
+  ): boolean {
+    if (!required?.length) return true;
+    const tags = this.normalizeDietaryTags(raw);
+    return required.every((req) => {
+      const norm = req.trim().toLowerCase().replace(/_/g, '-');
+      return tags.some((t) => t === norm || t.replace(/_/g, '-') === norm);
+    });
+  }
+
+  private allergyKeywords(restriction: string): string[] {
+    const key = restriction.trim().toLowerCase().replace(/-/g, '_');
+    const map: Record<string, string[]> = {
+      dairy_free: [
+        'dairy',
+        'milk',
+        'cheese',
+        'cream',
+        'yogurt',
+        'butter',
+        'whey',
+      ],
+      lactose_intolerant: ['lactose', 'milk', 'cream', 'cheese'],
+      gluten_free: ['gluten', 'wheat', 'barley', 'rye', 'flour'],
+      nut_free: [
+        'nut',
+        'almond',
+        'peanut',
+        'walnut',
+        'cashew',
+        'pecan',
+        'hazelnut',
+        'pistachio',
+      ],
+      soy_free: ['soy', 'tofu', 'edamame'],
+      egg_free: ['egg'],
+      shellfish_free: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster'],
+      fish_free: ['fish', 'salmon', 'tuna', 'cod', 'anchovy'],
+      sesame_free: ['sesame', 'tahini'],
+      halal: ['pork', 'alcohol', 'wine', 'bacon'],
+      kosher: ['pork', 'shellfish', 'bacon'],
+      fodmap_low: ['garlic', 'onion', 'apple', 'honey'],
+    };
+    if (map[key]) return map[key];
+    return key
+      .split('_')
+      .filter((part) => part && !['free', 'low', 'intolerant'].includes(part));
+  }
+
   private matchesAnyAllergy(
     ingredients: Array<{ name: string }>,
     allergies: string[],
   ): boolean {
     const allergyTerms = allergies
+      .flatMap((entry) => this.allergyKeywords(entry))
       .map((entry) => entry.trim().toLowerCase())
       .filter((entry) => entry.length > 0);
     if (!allergyTerms.length) return false;
@@ -301,7 +465,7 @@ export class RecipesService {
     });
   }
 
-  private passesMacroBounds(
+  private passesNutritionFilters(
     nutrition: MacroNutrition,
     dto: RecipeSearchDto,
   ): boolean {
@@ -318,6 +482,20 @@ export class RecipesService {
       return false;
     }
     if (dto.minFats != null && nutrition.fats < dto.minFats) {
+      return false;
+    }
+    const micro = estimateMicronutrientsFromMacros(nutrition);
+    if (!this.passesMicroBounds(micro, dto)) return false;
+    return true;
+  }
+
+  private passesMicroBounds(
+    micro: MicronutrientMap,
+    dto: RecipeSearchDto,
+  ): boolean {
+    if (dto.minIron != null && micro.iron < dto.minIron) return false;
+    if (dto.minFiber != null && micro.fiber < dto.minFiber) return false;
+    if (dto.minVitaminD != null && micro.vitamin_d < dto.minVitaminD) {
       return false;
     }
     return true;

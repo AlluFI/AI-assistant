@@ -27,7 +27,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Numbers Dont Lie API')
     .setDescription(
-      'Numbers Dont Lie — Parts 1–3 (wellness, nutrition, AI assistant bootstrap).',
+      'Wellness platform API — health, nutrition, meal planning, recipes, and shopping lists.',
     )
     .setVersion('0.1.0')
     .addBearerAuth(

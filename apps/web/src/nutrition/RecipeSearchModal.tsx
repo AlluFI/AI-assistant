@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DIETARY_RESTRICTION_OPTIONS } from '../profileFormModel'
+import { EnhancedRecipePanel } from './EnhancedNutritionPanels'
+import { RecipeCommunityFeedback } from './RecipeCommunityFeedback'
+import { RecipeNutritionViz } from './RecipeNutritionViz'
+import type { EnhancedRecipeNutrition } from './types'
 import { formatDietaryTags, formatPreparationStep } from './recipeDisplay'
-
-const apiBase = import.meta.env.VITE_API_BASE ?? '/api'
+import { apiGet, apiPost } from '../lib/apiClient'
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const
 const CUISINES = [
   'Italian',
@@ -38,6 +42,9 @@ type RecipeSummary = {
   relevanceScore?: number
   dietary_tags?: string[]
   nutrition?: { calories?: number; protein?: number; carbs?: number; fats?: number }
+  verified?: boolean
+  community_score?: number | null
+  community_rating_count?: number
 }
 
 type RecipeDetail = RecipeSummary & {
@@ -46,6 +53,7 @@ type RecipeDetail = RecipeSummary & {
   dietary_tags?: string[]
   source?: string
   img?: string
+  enhanced_nutrition?: EnhancedRecipeNutrition
 }
 
 type RecipeScaleData = {
@@ -91,7 +99,11 @@ export function RecipeSearchModal({
   const [minProtein, setMinProtein] = useState('')
   const [minCarbs, setMinCarbs] = useState('')
   const [minFats, setMinFats] = useState('')
-  const [dietaryTags, setDietaryTags] = useState('')
+  const [minIron, setMinIron] = useState('')
+  const [minFiber, setMinFiber] = useState('')
+  const [minVitaminD, setMinVitaminD] = useState('')
+  const [selectedDietaryTags, setSelectedDietaryTags] = useState<string[]>([])
+  const [searchRestrictions, setSearchRestrictions] = useState<string[]>([])
   const [applyProfileFilters, setApplyProfileFilters] = useState(true)
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<RecipeSummary[]>([])
@@ -107,18 +119,9 @@ export function RecipeSearchModal({
   const [substituteReason, setSubstituteReason] = useState('')
   const [substituteLoading, setSubstituteLoading] = useState(false)
   const [substituteResult, setSubstituteResult] = useState<SubstituteResult | null>(null)
-
   const modalRef = useRef<HTMLElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
-
-  const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }),
-    [accessToken],
-  )
 
   const resetDetail = useCallback(() => {
     setRecipe(null)
@@ -160,6 +163,33 @@ export function RecipeSearchModal({
     }
   }, [isOpen, view, close, resetDetail])
 
+  const normalizedProfileRestrictions = useMemo(() => {
+    if (Array.isArray(profileRestrictions)) {
+      return profileRestrictions.filter((t) => typeof t === 'string' && t.trim())
+    }
+    return []
+  }, [profileRestrictions])
+
+  const toggleSearchRestriction = useCallback((value: string, checked: boolean) => {
+    setSearchRestrictions((prev) =>
+      checked ? [...prev, value] : prev.filter((v) => v !== value),
+    )
+  }, [])
+
+  const toggleDietaryTag = useCallback((value: string, checked: boolean) => {
+    setSelectedDietaryTags((prev) =>
+      checked ? [...prev, value] : prev.filter((v) => v !== value),
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setSearchRestrictions((prev) => {
+      if (prev.length) return prev
+      return applyProfileFilters ? [...normalizedProfileRestrictions] : []
+    })
+  }, [isOpen, applyProfileFilters, normalizedProfileRestrictions])
+
   async function runSearch() {
     setSearching(true)
     setError('')
@@ -175,32 +205,27 @@ export function RecipeSearchModal({
       if (minProtein) params.set('minProtein', minProtein)
       if (minCarbs) params.set('minCarbs', minCarbs)
       if (minFats) params.set('minFats', minFats)
-      for (const tag of dietaryTags.split(',').map((t) => t.trim()).filter(Boolean)) {
-        params.append('dietaryTags', tag)
+      if (minIron) params.set('minIron', minIron)
+      if (minFiber) params.set('minFiber', minFiber)
+      if (minVitaminD) params.set('minVitaminD', minVitaminD)
+      for (const tag of selectedDietaryTags) {
+        if (tag.trim()) params.append('dietaryTags', tag.trim())
       }
       params.set('limit', '25')
+      const allergyTerms = new Set<string>()
+      for (const tag of searchRestrictions) {
+        if (tag.trim()) allergyTerms.add(tag.trim())
+      }
       if (applyProfileFilters) {
-        for (const tag of profileRestrictions) {
-          if (tag.trim()) params.append('allergies', tag.trim())
+        for (const tag of normalizedProfileRestrictions) {
+          if (tag.trim()) allergyTerms.add(tag.trim())
         }
       }
-      const res = await fetch(`${apiBase}/recipes?${params.toString()}`, { headers })
-      const body = await res.json().catch(() => [])
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Recipe search failed')
+      for (const tag of allergyTerms) {
+        params.append('allergies', tag)
       }
-      let rows = Array.isArray(body) ? (body as RecipeSummary[]) : []
-      const tagFilters = dietaryTags
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean)
-      if (tagFilters.length && !q) {
-        rows = rows.filter((row) => {
-          const tags = (row.dietary_tags ?? []).map((t) => t.toLowerCase())
-          return tagFilters.every((t) => tags.includes(t))
-        })
-      }
-      setResults(rows)
+      const body = await apiGet<RecipeSummary[]>(`/recipes?${params.toString()}`, accessToken)
+      setResults(Array.isArray(body) ? body : [])
       setHasSearched(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Recipe search failed')
@@ -216,12 +241,7 @@ export function RecipeSearchModal({
     setError('')
     resetDetail()
     try {
-      const res = await fetch(`${apiBase}/recipes/${recipeId}`, { headers })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Could not load recipe')
-      }
-      const data = body as RecipeDetail
+      const data = await apiGet<RecipeDetail>(`/recipes/${recipeId}`, accessToken)
       setRecipe(data)
       const initial = Math.max(1, data.servings)
       setServings(initial)
@@ -237,16 +257,11 @@ export function RecipeSearchModal({
   async function loadScale(recipeId: string, nextServings: number) {
     setScaleLoading(true)
     try {
-      const res = await fetch(`${apiBase}/recipes/scale`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ recipeId, servings: nextServings }),
+      const body = await apiPost<RecipeScaleData>('/recipes/scale', accessToken, {
+        recipeId,
+        servings: nextServings,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Could not scale recipe')
-      }
-      setScaleData(body as RecipeScaleData)
+      setScaleData(body)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not scale recipe')
       setScaleData(null)
@@ -261,20 +276,16 @@ export function RecipeSearchModal({
     setSubstituteResult(null)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/recipes/${recipe.id}/substitute-ingredient`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const body = await apiPost<SubstituteResult>(
+        `/recipes/${recipe.id}/substitute-ingredient`,
+        accessToken,
+        {
           ingredient: substituteIngredient.trim(),
           reason: substituteReason.trim() || undefined,
           limit: 3,
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Substitution failed')
-      }
-      setSubstituteResult(body as SubstituteResult)
+        },
+      )
+      setSubstituteResult(body)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Substitution failed')
     } finally {
@@ -351,6 +362,65 @@ export function RecipeSearchModal({
                   ))}
                 </select>
               </label>
+            </div>
+            <fieldset className="profileSection recipeSearchDietaryTags">
+              <legend>Dietary tags (match all selected)</legend>
+              <p className="hint">
+                Tap one or more tags. Only recipes that include every selected tag are shown.
+              </p>
+              <div className="recipeSearchTagChips" role="group" aria-label="Dietary tags">
+                {DIETARY_TAGS.map((tag) => {
+                  const selected = selectedDietaryTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`recipeSearchChip${selected ? ' selected' : ''}`}
+                      aria-pressed={selected}
+                      onClick={() => toggleDietaryTag(tag, !selected)}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
+            <fieldset className="profileSection recipeSearchRestrictions">
+              <legend>Exclude recipes containing (dietary restrictions)</legend>
+              <p className="hint">
+                Tap restrictions to exclude recipes with matching ingredients.
+              </p>
+              <div className="recipeSearchTagChips" role="group" aria-label="Dietary restrictions">
+                {DIETARY_RESTRICTION_OPTIONS.map((o) => {
+                  const selected = searchRestrictions.includes(o.value)
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className={`recipeSearchChip${selected ? ' selected' : ''}`}
+                      aria-pressed={selected}
+                      onClick={() => toggleSearchRestriction(o.value, !selected)}
+                    >
+                      {o.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
+            <label className="toggleLabel recipeSearchProfileToggle">
+              <input
+                type="checkbox"
+                checked={applyProfileFilters}
+                onChange={(e) => setApplyProfileFilters(e.target.checked)}
+              />
+              Also apply dietary restrictions from my health profile
+              {normalizedProfileRestrictions.length
+                ? ` (${normalizedProfileRestrictions.join(', ')})`
+                : ''}
+            </label>
+            <details className="recipeSearchMoreFilters">
+              <summary>More filters (ingredient, prep time, macros, micronutrients)</summary>
+              <div className="formGrid recipeSearchFilters">
               <label>
                 Ingredient
                 <input
@@ -405,28 +475,37 @@ export function RecipeSearchModal({
                 />
               </label>
               <label>
-                Dietary tags
+                Min iron / serving (mg, estimated)
                 <input
-                  value={dietaryTags}
-                  onChange={(e) => setDietaryTags(e.target.value)}
-                  placeholder="e.g. vegetarian, high-protein"
-                  list="recipe-dietary-tags"
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={minIron}
+                  onChange={(e) => setMinIron(e.target.value)}
                 />
-                <datalist id="recipe-dietary-tags">
-                  {DIETARY_TAGS.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
               </label>
-            </div>
-            <label className="toggleLabel recipeSearchProfileToggle">
-              <input
-                type="checkbox"
-                checked={applyProfileFilters}
-                onChange={(e) => setApplyProfileFilters(e.target.checked)}
-              />
-              Exclude recipes with ingredients matching my dietary restrictions
-            </label>
+              <label>
+                Min fiber / serving (g, estimated)
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={minFiber}
+                  onChange={(e) => setMinFiber(e.target.value)}
+                />
+              </label>
+              <label>
+                Min vitamin D / serving (mcg, estimated)
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={minVitaminD}
+                  onChange={(e) => setMinVitaminD(e.target.value)}
+                />
+              </label>
+              </div>
+            </details>
             <div className="row">
               <button type="button" onClick={() => void runSearch()} disabled={searching}>
                 {searching ? 'Searching…' : 'Search'}
@@ -451,6 +530,10 @@ export function RecipeSearchModal({
                         : ''}
                       {row.nutrition?.calories != null
                         ? ` · ${Math.round(row.nutrition.calories)} kcal/serving`
+                        : ''}
+                      {row.verified ? ' · Verified' : ''}
+                      {row.community_score != null
+                        ? ` · ★${row.community_score}`
                         : ''}
                       {row.relevanceScore != null
                         ? ` · match ${Math.round(row.relevanceScore * 100)}%`
@@ -527,26 +610,34 @@ export function RecipeSearchModal({
                   <p className="hint loadingPulse">Scaling nutrition…</p>
                 ) : scaleData ? (
                   <>
-                    <p>
-                      <strong>Total ({scaleData.servings} servings):</strong>{' '}
-                      {Math.round(scaleData.nutrition.calories)} kcal · P{' '}
-                      {Math.round(scaleData.nutrition.protein)}g · C{' '}
-                      {Math.round(scaleData.nutrition.carbs)}g · F{' '}
-                      {Math.round(scaleData.nutrition.fats)}g
-                    </p>
-                    <p>
-                      <strong>Per serving:</strong>{' '}
-                      {Math.round(scaleData.perServing.calories)} kcal · P{' '}
-                      {Math.round(scaleData.perServing.protein)}g · C{' '}
-                      {Math.round(scaleData.perServing.carbs)}g · F{' '}
-                      {Math.round(scaleData.perServing.fats)}g
-                    </p>
+                    {scaleData.servings > 1 ? (
+                      <RecipeNutritionViz
+                        title={`Total nutrition (${scaleData.servings} servings)`}
+                        nutrition={scaleData.nutrition}
+                        footnote="Summed from scaled ingredient quantities."
+                      />
+                    ) : null}
+                    <RecipeNutritionViz
+                      title="Nutrition per serving"
+                      nutrition={scaleData.perServing}
+                      footnote="Calculated from recipe ingredients (function-calling nutrition path)."
+                    />
                   </>
                 ) : recipe.nutrition ? (
-                  <p>
-                    <strong>Per serving:</strong>{' '}
-                    {Math.round(recipe.nutrition.calories ?? 0)} kcal
-                  </p>
+                  <RecipeNutritionViz
+                    title="Nutrition per serving"
+                    nutrition={{
+                      calories: recipe.nutrition.calories ?? 0,
+                      protein: recipe.nutrition.protein ?? 0,
+                      carbs: recipe.nutrition.carbs ?? 0,
+                      fats: recipe.nutrition.fats ?? 0,
+                    }}
+                    footnote="Calculated from recipe ingredients."
+                  />
+                ) : null}
+
+                {recipe.enhanced_nutrition ? (
+                  <EnhancedRecipePanel data={recipe.enhanced_nutrition} />
                 ) : null}
 
                 <h3>Ingredients</h3>
@@ -569,6 +660,15 @@ export function RecipeSearchModal({
                 ) : (
                   <p className="hint">No preparation steps available.</p>
                 )}
+
+                <RecipeCommunityFeedback
+                  accessToken={accessToken}
+                  recipeId={recipe.id}
+                  setError={setError}
+                  recipeVerified={recipe.verified}
+                  communityScore={recipe.community_score}
+                  communityRatingCount={recipe.community_rating_count}
+                />
 
                 <div className="card recipeSubstituteBlock">
                   <h3 style={{ marginTop: 0 }}>Ingredient substitution</h3>

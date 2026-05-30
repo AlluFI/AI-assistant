@@ -1,41 +1,34 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { cosineSimilarity, textToEmbedding } from '../shared/embeddings.util';
+import { RecipeCommunityService } from '../recipe-feedback/recipe-community.service';
+import { textToEmbedding } from '../shared/embeddings.util';
+import {
+  buildAugmentedRagPrompt,
+  recipeEmbeddingVector,
+  scoreRecipeRelevance,
+  sortRetrievedRecipes,
+  type RetrievedRecipe,
+} from './rag.util';
 
-export type RetrievedRecipe = {
-  id: string;
-  title: string;
-  cuisine: string;
-  relevanceScore: number;
-  summary: string;
-  dietaryTags: string[];
-};
+export type { RetrievedRecipe } from './rag.util';
 
 @Injectable()
 export class RagService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  recipeEmbeddingText(recipe: {
-    title: string;
-    cuisine: string;
-    summary: string;
-    dietaryTags: unknown;
-    meal: string;
-  }): string {
-    const tags = Array.isArray(recipe.dietaryTags)
-      ? recipe.dietaryTags.join(' ')
-      : '';
-    return `${recipe.title} ${recipe.cuisine} ${recipe.meal} ${recipe.summary} ${tags}`;
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly community: RecipeCommunityService,
+  ) {}
 
   async ensureRecipeEmbedding(recipeId: string) {
     const recipe = await this.prisma.recipe.findUnique({
       where: { id: recipeId },
     });
     if (!recipe) return;
-    if (recipe.embedding) return;
-    const embedding = textToEmbedding(this.recipeEmbeddingText(recipe));
+    if (recipe.embedding && !recipe.communityRagText) return;
+    const embedding = textToEmbedding(
+      this.community.recipeEmbeddingBase(recipe),
+    );
     await this.prisma.recipe.update({
       where: { id: recipeId },
       data: { embedding: embedding as unknown as Prisma.InputJsonValue },
@@ -64,50 +57,44 @@ export class RagService {
       where,
       take: 500,
     });
-    const scored = recipes
-      .map((r) => {
-        const emb =
-          (r.embedding as number[] | null) ??
-          textToEmbedding(this.recipeEmbeddingText(r));
-        let score = cosineSimilarity(queryVec, emb);
-        const tags = Array.isArray(r.dietaryTags)
-          ? (r.dietaryTags as string[])
-          : [];
-        if (opts?.dietaryTags?.length) {
-          const overlap = opts.dietaryTags.filter((t) =>
-            tags.some((x) => x.toLowerCase() === t.toLowerCase()),
-          ).length;
-          score += overlap * 0.05;
-        }
-        return {
-          id: r.id,
-          title: r.title,
-          cuisine: r.cuisine,
-          relevanceScore: Math.round(score * 1000) / 1000,
-          summary: r.summary,
+    const scored = recipes.map((r) => {
+      const tags = Array.isArray(r.dietaryTags)
+        ? (r.dietaryTags as string[])
+        : [];
+      const emb = recipeEmbeddingVector(
+        r.embedding as number[] | null,
+        this.community.recipeEmbeddingBase(r),
+      );
+      const relevanceScore = scoreRecipeRelevance(
+        queryVec,
+        emb,
+        {
           dietaryTags: tags,
-        };
-      })
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .slice(0, limit);
-    return scored;
+          communityScore: r.communityScore,
+          communityRatingCount: r.communityRatingCount,
+          verified: r.verified,
+        },
+        { dietaryTags: opts?.dietaryTags },
+      );
+      return {
+        id: r.id,
+        title: r.title,
+        cuisine: r.cuisine,
+        relevanceScore,
+        summary: r.summary,
+        dietaryTags: tags,
+        communityScore: r.communityScore,
+        communityRatingCount: r.communityRatingCount,
+        verified: r.verified,
+      };
+    });
+    return sortRetrievedRecipes(scored).slice(0, limit);
   }
 
   buildAugmentedPrompt(
     userQuery: string,
     retrieved: RetrievedRecipe[],
   ): string {
-    const examples = retrieved
-      .map(
-        (r, i) =>
-          `${i + 1}. [${r.id}] ${r.title} (${r.cuisine}, score ${r.relevanceScore}): ${r.summary}`,
-      )
-      .join('\n');
-    return [
-      `User request: ${userQuery}`,
-      'Retrieved recipes from knowledge base (use as grounding, adapt to user preferences):',
-      examples || '(no close matches — stay conservative and realistic)',
-      'Generate a customized recipe JSON grounded in these examples.',
-    ].join('\n\n');
+    return buildAugmentedRagPrompt(userQuery, retrieved);
   }
 }

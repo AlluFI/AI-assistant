@@ -14,7 +14,7 @@ export type LlmChatResult = {
   model: string;
 };
 
-/** Provider-agnostic surface for Phase 3 wingman (see docs/STACK.md). */
+/** Provider-agnostic surface for Phase 3 wingman (see ai-assistant/docs/STACK.md). */
 export interface LlmClient {
   readonly provider: string;
   readonly model: string;

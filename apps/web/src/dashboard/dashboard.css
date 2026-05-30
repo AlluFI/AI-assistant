@@ -587,3 +587,44 @@
 .chartTooltip p {
   margin: 0.15rem 0;
 }
+
+.insightsGrouped {
+  display: grid;
+  gap: 1rem;
+}
+
+.insightsSection h2 {
+  margin-top: 0;
+}
+
+.nutritionInsightTeaser {
+  margin: 0 0 0.65rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+}
+
+.healthDashboard .nutritionDailyCompact {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.nutritionHistoricalBlock {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.nutritionWeeklySummaryInline {
+  margin-bottom: 0.5rem;
+}
+
+.nutritionStatusInline.status-deficit {
+  color: #16a34a;
+}
+
+.nutritionStatusInline.status-surplus {
+  color: #dc2626;
+}

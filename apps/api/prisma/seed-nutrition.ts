@@ -7,6 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { textToEmbedding } from '../src/shared/embeddings.util';
 import { CUISINE_VALUES } from '../src/shared/dietary-catalog';
+import { deriveRecipeEnhancedNutrition } from '../src/shared/enhanced-nutrition.util';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -175,6 +176,15 @@ async function seedRecipes(count: number) {
       continue;
     }
 
+    const enhanced = deriveRecipeEnhancedNutrition({
+      id,
+      title,
+      meal,
+      dietaryTags,
+      timeMinutes: 15 + (i % 45),
+      difficultyLevel: DIFFICULTIES[i % DIFFICULTIES.length]!,
+    });
+
     await prisma.recipe.create({
       data: {
         id,
@@ -190,6 +200,14 @@ async function seedRecipes(count: number) {
         img: `/images/recipes/${id}.jpg`,
         preparation,
         embedding: embedding as unknown as Prisma.InputJsonValue,
+        glycemicIndex: enhanced.glycemic_index,
+        antioxidantProfile:
+          enhanced.antioxidant_profile as unknown as Prisma.InputJsonValue,
+        nutrientDensityScore: enhanced.nutrient_density_score,
+        processingLevel: enhanced.processing_level,
+        environmentalImpact:
+          enhanced.environmental_impact as unknown as Prisma.InputJsonValue,
+        satietyIndex: enhanced.satiety_index,
       },
     });
 
@@ -209,11 +227,45 @@ async function seedRecipes(count: number) {
   console.log(`Recipes in database: ${finalCount} (target ${count})`);
 }
 
+async function backfillRecipeEnhanced() {
+  const rows = await prisma.recipe.findMany({
+    where: { glycemicIndex: null },
+    select: {
+      id: true,
+      title: true,
+      meal: true,
+      dietaryTags: true,
+      timeMinutes: true,
+      difficultyLevel: true,
+    },
+  });
+  for (const recipe of rows) {
+    const enhanced = deriveRecipeEnhancedNutrition(recipe);
+    await prisma.recipe.update({
+      where: { id: recipe.id },
+      data: {
+        glycemicIndex: enhanced.glycemic_index,
+        antioxidantProfile:
+          enhanced.antioxidant_profile as unknown as Prisma.InputJsonValue,
+        nutrientDensityScore: enhanced.nutrient_density_score,
+        processingLevel: enhanced.processing_level,
+        environmentalImpact:
+          enhanced.environmental_impact as unknown as Prisma.InputJsonValue,
+        satietyIndex: enhanced.satiety_index,
+      },
+    });
+  }
+  if (rows.length > 0) {
+    console.log(`Backfilled enhanced nutrition on ${rows.length} recipes`);
+  }
+}
+
 async function main() {
   const ingredientCount = Number(process.env.SEED_INGREDIENT_COUNT ?? 500);
   const recipeCount = Number(process.env.SEED_RECIPE_COUNT ?? 500);
   await seedIngredients(ingredientCount);
   await seedRecipes(recipeCount);
+  await backfillRecipeEnhanced();
 }
 
 main()

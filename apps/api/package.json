@@ -20,9 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "demo:seed": "prisma db execute --file prisma/demo-seed.sql",
+    "demo:seed": "prisma db execute --file prisma/demo-seed.sql && ts-node --transpile-only prisma/seed-demo-extras.ts",
     "nutrition:seed": "ts-node --transpile-only prisma/seed-nutrition.ts",
-    "wingman:eval": "ts-node --transpile-only src/assistant/eval/run-wingman-eval.ts"
+    "wingman:eval": "ts-node --transpile-only src/assistant/eval/run-wingman-eval.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

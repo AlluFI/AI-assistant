@@ -26,3 +26,5 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 ## Relation to counting-calories
 
 [counting-calories](https://gitea.kood.tech/aleksirosendahl/counting-calories) was the Part 1–2 development repo. Its contents were copied here; **new work happens only in this repository.**
+
+**Sync (2026-05-30):** Parts 1–2 changes through `6290fe5` (enhanced nutrition, recipe community feedback, meal-plan refactor, auth UI module, tests) were merged into this repo while preserving Part 3 wingman, meal photos, and cross-session memory.

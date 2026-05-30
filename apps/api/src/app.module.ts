@@ -16,6 +16,7 @@ import { InsightsModule } from './insights/insights.module';
 import { NutritionModule } from './nutrition/nutrition.module';
 import { NutritionToolsModule } from './nutrition-tools/nutrition-tools.module';
 import { RagModule } from './rag/rag.module';
+import { RecipeFeedbackModule } from './recipe-feedback/recipe-feedback.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { MealPlansModule } from './meal-plans/meal-plans.module';
 import { ShoppingListsModule } from './shopping-lists/shopping-lists.module';
@@ -47,6 +48,7 @@ import { MealPhotosModule } from './meal-photos/meal-photos.module';
     NutritionToolsModule,
     RagModule,
     RecipesModule,
+    RecipeFeedbackModule,
     MealPlansModule,
     ShoppingListsModule,
     NutritionAnalyticsModule,

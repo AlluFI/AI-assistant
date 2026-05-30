@@ -1,3 +1,6 @@
+-- Base demo account, profile, weekly metric snapshots, privacy, and consents.
+-- Activity logs, nutrition profile, and hidden intake history (charts only): prisma/seed-demo-extras.ts (via pnpm demo:seed).
+
 INSERT INTO "User" (
   "id",
   "email",

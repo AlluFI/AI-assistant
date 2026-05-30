@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { MealMacroChart } from './MealMacroChart'
+import { EnhancedMealPlanPanel, EnhancedRecipePanel } from './EnhancedNutritionPanels'
+import { RecipeCommunityFeedback } from './RecipeCommunityFeedback'
 import { GenerationStepsPanel } from './GenerationStepsPanel'
+import { RecipeNutritionViz } from './RecipeNutritionViz'
 import { formatDietaryTags, formatPreparationStep } from './recipeDisplay'
-import { readApiJson } from '../lib/apiJson'
-import type { MealPlanListItem, MealPlanVersionDetail, PlannedMealRow } from './types'
+import { devToolsEnabled } from '../devTools'
+import { apiGet, apiPost, apiRequest } from '../lib/apiClient'
+import type {
+  EnhancedRecipeNutrition,
+  MealPlanListItem,
+  MealPlanVersionDetail,
+  PlannedMealRow,
+} from './types'
 
-const apiBase = import.meta.env.VITE_API_BASE ?? '/api'
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const
 type RecipeModalData = {
   id: string
@@ -22,6 +30,10 @@ type RecipeModalData = {
   dietary_tags?: string[] | null
   source?: string | null
   img?: string | null
+  enhanced_nutrition?: EnhancedRecipeNutrition
+  verified?: boolean
+  community_score?: number | null
+  community_rating_count?: number
 }
 type RecipeScaleData = {
   servings: number
@@ -117,50 +129,34 @@ export function MealPlanDetail({
     PlannedMealRow['nutrition'] | null
   >(null)
 
-  const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }),
-    [accessToken],
-  )
-
   const loadPlan = useCallback(async () => {
     if (!planId) {
       setPlanDetail(null)
       setVersionId(null)
       return
     }
-    const res = await fetch(`${apiBase}/meal-plans/${planId}`, { headers })
-    let body: {
-      id: string
-      duration: string
-      startDate: string
-      versions?: MealPlanVersionDetail[]
-      message?: string
-    }
     try {
-      body = await readApiJson(res)
+      const body = await apiGet<{
+        id: string
+        duration: string
+        startDate: string
+        versions?: MealPlanVersionDetail[]
+      }>(`/meal-plans/${planId}`, accessToken)
+      const versions = (body.versions ?? []) as MealPlanVersionDetail[]
+      setPlanDetail({
+        id: body.id,
+        duration: body.duration,
+        startDate: body.startDate,
+        versions,
+      })
+      const active = versions.find((v) => v.isActive) ?? versions[0]
+      setVersionId(active?.id ?? null)
+      setSelectedDay(0)
+      setLocalDayOrder(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load meal plan')
-      return
     }
-    if (!res.ok) {
-      setError(body.message ?? 'Failed to load meal plan')
-      return
-    }
-    const versions = (body.versions ?? []) as MealPlanVersionDetail[]
-    setPlanDetail({
-      id: body.id,
-      duration: body.duration,
-      startDate: body.startDate,
-      versions,
-    })
-    const active = versions.find((v) => v.isActive) ?? versions[0]
-    setVersionId(active?.id ?? null)
-    setSelectedDay(0)
-    setLocalDayOrder(null)
-  }, [planId, headers, setError])
+  }, [planId, accessToken, setError])
 
   useEffect(() => {
     void loadPlan()
@@ -218,15 +214,20 @@ export function MealPlanDetail({
     return typeof n === 'number' && n > 0 ? n : null
   })()
 
-  async function runVersionAction(action: () => Promise<Response>, successMsg: string) {
+  async function runVersionAction(
+    path: string,
+    init: { method?: string; body?: unknown } = {},
+    successMsg = 'Saved',
+  ) {
     setBusy(true)
     setError('')
     try {
-      const res = await action()
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { message?: string }).message ?? 'Request failed')
-      }
+      await apiRequest(path, {
+        accessToken,
+        method: init.method ?? 'POST',
+        body: init.body,
+        parseJson: false,
+      })
       setMessage(successMsg)
       setLocalDayOrder(null)
       await loadPlan()
@@ -253,12 +254,8 @@ export function MealPlanDetail({
       return
     }
     void runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/versions/${versionId}/swap`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ mealIdA: swapFirstId, mealIdB: mealId }),
-        }),
+      `/meal-plans/versions/${versionId}/swap`,
+      { body: { mealIdA: swapFirstId, mealIdB: mealId } },
       'Meals swapped',
     )
   }
@@ -266,12 +263,8 @@ export function MealPlanDetail({
   async function selectAlternative(mealId: string, recipeId: string) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/versions/${versionId}/meals/${mealId}/alternative`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ recipeId }),
-        }),
+      `/meal-plans/versions/${versionId}/meals/${mealId}/alternative`,
+      { body: { recipeId } },
       'Alternative meal applied',
     )
   }
@@ -279,11 +272,8 @@ export function MealPlanDetail({
   async function logMealEaten(mealId: string, eaten: boolean) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(
-          `${apiBase}/meal-plans/versions/${versionId}/meals/${mealId}/${eaten ? 'log-eaten' : 'unlog-eaten'}`,
-          { method: 'POST', headers },
-        ),
+      `/meal-plans/versions/${versionId}/meals/${mealId}/${eaten ? 'log-eaten' : 'unlog-eaten'}`,
+      {},
       eaten ? 'Meal logged as eaten' : 'Meal removed from today’s intake',
     )
   }
@@ -291,11 +281,8 @@ export function MealPlanDetail({
   async function logAllDayMeals(eaten: boolean) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(
-          `${apiBase}/meal-plans/versions/${versionId}/days/${selectedDay}/${eaten ? 'log-all-eaten' : 'unlog-all-eaten'}`,
-          { method: 'POST', headers },
-        ),
+      `/meal-plans/versions/${versionId}/days/${selectedDay}/${eaten ? 'log-all-eaten' : 'unlog-all-eaten'}`,
+      {},
       eaten ? 'All meals for this day logged' : 'All meals for this day unlogged',
     )
   }
@@ -303,11 +290,8 @@ export function MealPlanDetail({
   async function regenerateMeal(mealId: string) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/versions/${versionId}/meals/${mealId}/regenerate`, {
-          method: 'POST',
-          headers,
-        }),
+      `/meal-plans/versions/${versionId}/meals/${mealId}/regenerate`,
+      {},
       'Meal regenerated with a new recipe',
     )
   }
@@ -315,12 +299,8 @@ export function MealPlanDetail({
   async function changeMealType(mealId: string, mealType: string) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/versions/${versionId}/meals/${mealId}`, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({ mealType }),
-        }),
+      `/meal-plans/versions/${versionId}/meals/${mealId}`,
+      { method: 'PATCH', body: { mealType } },
       `Meal slot set to ${mealType}`,
     )
   }
@@ -328,12 +308,8 @@ export function MealPlanDetail({
   async function persistReorder(orderedIds: string[]) {
     if (!versionId) return
     await runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/versions/${versionId}/reorder`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ dayIndex: selectedDay, mealIds: orderedIds }),
-        }),
+      `/meal-plans/versions/${versionId}/reorder`,
+      { body: { dayIndex: selectedDay, mealIds: orderedIds } },
       'Meal order updated',
     )
   }
@@ -365,11 +341,8 @@ export function MealPlanDetail({
   async function restoreVersion(vid: string) {
     if (!planDetail) return
     await runVersionAction(
-      () =>
-        fetch(`${apiBase}/meal-plans/${planDetail.id}/versions/${vid}/restore`, {
-          method: 'POST',
-          headers,
-        }),
+      `/meal-plans/${planDetail.id}/versions/${vid}/restore`,
+      {},
       'Version restored',
     )
   }
@@ -379,16 +352,11 @@ export function MealPlanDetail({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/shopping-lists/from-version/${versionId}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { message?: string }).message ?? 'Could not create shopping list')
-      }
-      const created = (await res.json()) as { id?: string }
+      const created = await apiPost<{ id?: string }>(
+        `/shopping-lists/from-version/${versionId}`,
+        accessToken,
+        {},
+      )
       if (created.id) onShoppingListCreated?.(created.id)
       setMessage('Shopping list created — opening list')
     } catch (e) {
@@ -403,16 +371,11 @@ export function MealPlanDetail({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/shopping-lists/from-meal/${versionId}/${mealId}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ title: `Shopping list — ${mealTitle}` }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { message?: string }).message ?? 'Could not create meal shopping list')
-      }
-      const created = (await res.json()) as { id?: string }
+      const created = await apiPost<{ id?: string }>(
+        `/shopping-lists/from-meal/${versionId}/${mealId}`,
+        accessToken,
+        { title: `Shopping list — ${mealTitle}` },
+      )
       if (created.id) onShoppingListCreated?.(created.id)
       setMessage('Meal shopping list created')
     } catch (e) {
@@ -427,19 +390,11 @@ export function MealPlanDetail({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/meal-plans/versions/${versionId}/confirm-recipes`, {
-        method: 'POST',
-        headers,
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Could not confirm recipes')
-      }
-      const msg =
-        typeof (body as { message?: unknown }).message === 'string'
-          ? ((body as { message: string }).message)
-          : 'Meal plan recipes confirmed.'
-      setMessage(msg)
+      const body = await apiPost<{ message?: string }>(
+        `/meal-plans/versions/${versionId}/confirm-recipes`,
+        accessToken,
+      )
+      setMessage(body.message ?? 'Meal plan recipes confirmed.')
       await loadPlan()
       await onRefreshPlans()
       await onRefreshAnalytics()
@@ -471,15 +426,7 @@ export function MealPlanDetail({
         title,
       }
       if (manualMealCalories) payload.calories = Number(manualMealCalories)
-      const res = await fetch(`${apiBase}/meal-plans/versions/${versionId}/meals`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { message?: string }).message ?? 'Could not add manual meal')
-      }
+      await apiPost(`/meal-plans/versions/${versionId}/meals`, accessToken, payload)
       setMessage('Manual meal added')
       setManualMealTitle('')
       setManualMealCalories('')
@@ -504,14 +451,7 @@ export function MealPlanDetail({
     setRecipeModalData(null)
     setRecipePlannedNutrition(plannedNutrition ?? null)
     try {
-      const res = await fetch(`${apiBase}/recipes/${recipeId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Could not load recipe')
-      }
-      const recipe = body as RecipeModalData
+      const recipe = await apiGet<RecipeModalData>(`/recipes/${recipeId}`, accessToken)
       setRecipeModalData(recipe)
       const initialServings = Math.max(1, recipe.servings)
       setRecipeServings(initialServings)
@@ -527,16 +467,11 @@ export function MealPlanDetail({
   async function loadScaledRecipe(recipeId: string, servings: number) {
     setRecipeScaleLoading(true)
     try {
-      const res = await fetch(`${apiBase}/recipes/scale`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ recipeId, servings }),
+      const body = await apiPost<RecipeScaleData>('/recipes/scale', accessToken, {
+        recipeId,
+        servings,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error((body as { message?: string }).message ?? 'Could not scale recipe')
-      }
-      setRecipeScaleData(body as RecipeScaleData)
+      setRecipeScaleData(body)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not scale recipe')
       setRecipeScaleData(null)
@@ -665,10 +600,16 @@ export function MealPlanDetail({
             </p>
           ) : null}
 
-          <div className="card generationStepsCard">
-            <h3 style={{ marginTop: 0 }}>Plan generation (sequential AI)</h3>
-            <GenerationStepsPanel steps={activeVersion.generationSteps} />
-          </div>
+          {devToolsEnabled ? (
+            <div className="card generationStepsCard">
+              <h3 style={{ marginTop: 0 }}>Plan generation (sequential AI)</h3>
+              <GenerationStepsPanel steps={activeVersion.generationSteps} />
+            </div>
+          ) : null}
+
+          {activeVersion.enhanced_analytics ? (
+            <EnhancedMealPlanPanel data={activeVersion.enhanced_analytics} />
+          ) : null}
 
           {!swapMode && dayMeals.length > 1 ? (
             <p className="hint dragHint">Drag meal cards to reorder within the day.</p>
@@ -1008,38 +949,55 @@ export function MealPlanDetail({
                     ) : null}
                     {recipeScaleLoading ? (
                       <p className="hint loadingPulse">Scaling nutrition...</p>
-                    ) : recipeScaleData ? (
-                      <>
-                        <p>
-                          <strong>Nutrition total ({recipeScaleData.servings} servings):</strong>{' '}
-                          {Math.round(recipeScaleData.nutrition.calories)} kcal · P{' '}
-                          {Math.round(recipeScaleData.nutrition.protein)}g · C{' '}
-                          {Math.round(recipeScaleData.nutrition.carbs)}g · F{' '}
-                          {Math.round(recipeScaleData.nutrition.fats)}g
-                        </p>
-                        <p>
-                          <strong>
-                            {recipePlannedNutrition
-                              ? 'Full recipe (per serving):'
-                              : 'Per serving:'}
-                          </strong>{' '}
-                          {Math.round(recipeScaleData.perServing.calories)} kcal · P{' '}
-                          {Math.round(recipeScaleData.perServing.protein)}g · C{' '}
-                          {Math.round(recipeScaleData.perServing.carbs)}g · F{' '}
-                          {Math.round(recipeScaleData.perServing.fats)}g
-                        </p>
-                      </>
-                    ) : recipeModalData.nutrition ? (
-                      <p>
-                        <strong>
-                          {recipePlannedNutrition ? 'Full recipe (per serving):' : 'Per serving:'}
-                        </strong>{' '}
-                        {Math.round(recipeModalData.nutrition.calories ?? 0)} kcal · P{' '}
-                        {Math.round(recipeModalData.nutrition.protein ?? 0)}g · C{' '}
-                        {Math.round(recipeModalData.nutrition.carbs ?? 0)}g · F{' '}
-                        {Math.round(recipeModalData.nutrition.fats ?? 0)}g
-                      </p>
                     ) : null}
+                    {!recipeScaleLoading && recipeScaleData ? (
+                      <>
+                        {recipeScaleData.servings > 1 ? (
+                          <RecipeNutritionViz
+                            title={`Total nutrition (${recipeScaleData.servings} servings)`}
+                            nutrition={recipeScaleData.nutrition}
+                            footnote="Summed from scaled ingredient quantities."
+                          />
+                        ) : null}
+                        <RecipeNutritionViz
+                          title={
+                            recipePlannedNutrition
+                              ? 'Full recipe (per serving)'
+                              : 'Nutrition per serving'
+                          }
+                          nutrition={recipeScaleData.perServing}
+                          footnote="Calculated from recipe ingredients (function-calling nutrition path)."
+                        />
+                      </>
+                    ) : !recipeScaleLoading && recipeModalData.nutrition ? (
+                      <RecipeNutritionViz
+                        title={
+                          recipePlannedNutrition
+                            ? 'Full recipe (per serving)'
+                            : 'Nutrition per serving'
+                        }
+                        nutrition={{
+                          calories: recipeModalData.nutrition.calories ?? 0,
+                          protein: recipeModalData.nutrition.protein ?? 0,
+                          carbs: recipeModalData.nutrition.carbs ?? 0,
+                          fats: recipeModalData.nutrition.fats ?? 0,
+                        }}
+                        footnote="Calculated from recipe ingredients."
+                      />
+                    ) : !recipeScaleLoading ? (
+                      <p className="hint">Nutrition data not available.</p>
+                    ) : null}
+                    {recipeModalData.enhanced_nutrition ? (
+                      <EnhancedRecipePanel data={recipeModalData.enhanced_nutrition} />
+                    ) : null}
+                    <RecipeCommunityFeedback
+                      accessToken={accessToken}
+                      recipeId={recipeModalData.id}
+                      setError={setError}
+                      recipeVerified={recipeModalData.verified}
+                      communityScore={recipeModalData.community_score}
+                      communityRatingCount={recipeModalData.community_rating_count}
+                    />
                     <h3>Ingredients</h3>
                     <ul>
                       {(recipeScaleData?.scaledIngredients ?? recipeModalData.ingredients).map((item) => (

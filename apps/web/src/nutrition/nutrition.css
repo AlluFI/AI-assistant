@@ -114,6 +114,124 @@
   margin: 0.2rem 0;
 }
 
+.nutritionInsightsGrid.compact {
+  margin-top: 0.75rem;
+}
+
+.micronutrientsModal {
+  max-width: min(720px, 100%);
+}
+
+.micronutrientChartWrap {
+  margin: 1rem 0;
+}
+
+.micronutrientBlock {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.micronutrientBlock h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.micronutrientBlock ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.micronutrientFoodList {
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.micronutrientFoodList dt {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.micronutrientFoodList dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.verifiedBadge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #16a34a22;
+  color: #16a34a;
+  border: 1px solid #16a34a55;
+}
+
+.enhancedNutritionCard {
+  margin: 0.75rem 0;
+}
+
+.enhancedNutritionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.enhancedLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.enhancedLevelHigh {
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.enhancedLevelMid {
+  font-weight: 600;
+  color: #ca8a04;
+}
+
+.enhancedLevelLow {
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.verifiedRecipeList ul,
+.moderationList,
+.recipeReviewList ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.moderationItem {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.recipeFeedbackBlock textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  margin-top: 0.35rem;
+  font: inherit;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  background: var(--bg);
+  color: inherit;
+}
+
+.recipeRatingRow select {
+  margin-left: 0.35rem;
+}
+
 /* Meal plan detail */
 .mealPlanDetailHead {
   display: flex;
@@ -342,6 +460,65 @@
   width: 88px;
 }
 
+.mealMacroChart.detail {
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.mealMacroChart.detail .mealMacroLegend {
+  font-size: 0.75rem;
+}
+
+.recipeNutritionViz {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.recipeNutritionTitle {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.recipeNutritionCalories {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.recipeNutritionMacroLine {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.recipeNutritionCharts {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.2fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 520px) {
+  .recipeNutritionCharts {
+    grid-template-columns: 1fr;
+  }
+}
+
+.recipeNutritionChartBlock .chartTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, var(--text));
+  opacity: 0.85;
+}
+
+.recipeNutritionFootnote {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+}
+
 .mealMacroLegend {
   display: flex;
   justify-content: center;
@@ -381,6 +558,89 @@
 
 .recipeSearchProfileToggle {
   margin-bottom: 0.75rem;
+}
+
+.recipeSearchRestrictions {
+  margin-top: 1rem;
+}
+
+.recipeSearchDietaryTags {
+  margin-top: 1rem;
+}
+
+.recipeSearchMoreFilters {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0;
+}
+
+.recipeSearchMoreFilters summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.recipeSearchTagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.recipeSearchChip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.recipeSearchChip:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.recipeSearchChip.selected {
+  background: color-mix(in srgb, var(--primary) 18%, var(--bg-elev));
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.recipeSearchCheckboxGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.recipeSearchCheckboxGroup label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+  margin: 0;
+  cursor: pointer;
+}
+
+.recipeSearchCheckboxGroup input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.recipeSearchRestrictions .hint,
+.recipeSearchDietaryTags .hint {
+  margin: 0 0 0.5rem;
 }
 
 .recipeSearchResults {

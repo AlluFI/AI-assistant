@@ -2,6 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenAiClientService } from '../ai/openai-client.service';
 import { NutritionService } from '../nutrition/nutrition.service';
+import {
+  addMicronutrients,
+  emptyMicronutrients,
+  MICRONUTRIENT_FOOD_SUGGESTIONS,
+  MICRONUTRIENT_KEYS,
+  MICRONUTRIENT_LABELS,
+  MICRONUTRIENT_RDA,
+  MICRONUTRIENT_UNITS,
+  micronutrientsFromMealNutrition,
+  percentOfMicronutrientTarget,
+  type MicronutrientKey,
+  type MicronutrientMap,
+} from '../shared/micronutrients';
 import { addMacros, emptyMacros, MacroNutrition } from '../shared/units';
 
 @Injectable()
@@ -100,6 +113,112 @@ export class NutritionAnalyticsService {
       totalCarbs: rangeTotals.carbs,
       totalFats: rangeTotals.fats,
       daily,
+    };
+  }
+
+  async micronutrientReport(userId: string, endDate?: string, daysRaw = 7) {
+    const days = Math.min(90, Math.max(1, daysRaw));
+    const end = endDate ?? new Date().toISOString().slice(0, 10);
+    const startDate = new Date(`${end}T12:00:00.000Z`);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    const start = startDate.toISOString().slice(0, 10);
+
+    const { start: rangeStart } = this.dayBoundsUtc(start);
+    const { end: rangeEnd } = this.dayBoundsUtc(end);
+    const meals = await this.prisma.plannedMeal.findMany({
+      where: {
+        eatenAt: { gte: rangeStart, lte: rangeEnd },
+        version: { isActive: true, mealPlan: { userId } },
+      },
+      select: { eatenAt: true, nutrition: true },
+    });
+
+    const byDate = new Map<string, MicronutrientMap>();
+    for (const meal of meals) {
+      if (!meal.eatenAt) continue;
+      const date = meal.eatenAt.toISOString().slice(0, 10);
+      const prev = byDate.get(date) ?? emptyMicronutrients();
+      byDate.set(
+        date,
+        addMicronutrients(
+          prev,
+          micronutrientsFromMealNutrition(meal.nutrition),
+        ),
+      );
+    }
+
+    const daysWithIntake = [...byDate.values()];
+    const periodTotal = daysWithIntake.reduce(
+      (acc, day) => addMicronutrients(acc, day),
+      emptyMicronutrients(),
+    );
+    const dayCount = daysWithIntake.length;
+    const avgDaily: MicronutrientMap = emptyMicronutrients();
+    for (const key of MICRONUTRIENT_KEYS) {
+      avgDaily[key] =
+        dayCount > 0 ? Math.round((periodTotal[key] / dayCount) * 10) / 10 : 0;
+    }
+
+    const percentOfTarget = Object.fromEntries(
+      MICRONUTRIENT_KEYS.map((key) => [
+        key,
+        percentOfMicronutrientTarget(key, avgDaily[key]),
+      ]),
+    ) as Record<MicronutrientKey, number>;
+
+    const deficiencies: string[] = [];
+    const excesses: string[] = [];
+    const suggestions: string[] = [];
+
+    for (const key of MICRONUTRIENT_KEYS) {
+      const pct = percentOfTarget[key];
+      const label = MICRONUTRIENT_LABELS[key];
+      const unit = MICRONUTRIENT_UNITS[key];
+      const foods = MICRONUTRIENT_FOOD_SUGGESTIONS[key];
+
+      if (key === 'sodium') {
+        if (pct > 115) {
+          excesses.push(
+            `${label} is above the recommended max (${avgDaily[key]} ${unit} avg vs ${MICRONUTRIENT_RDA[key]} ${unit}).`,
+          );
+          suggestions.push(
+            `Reduce sodium: try ${foods.slice(0, 2).join(', ')}.`,
+          );
+        }
+        continue;
+      }
+
+      if (dayCount === 0) continue;
+      if (pct < 85) {
+        deficiencies.push(
+          `${label} is below target (${avgDaily[key]} ${unit}/day avg, ${pct}% of RDA).`,
+        );
+        suggestions.push(
+          `Boost ${label.toLowerCase()}: add ${foods.slice(0, 3).join(', ')}.`,
+        );
+      }
+    }
+
+    if (dayCount === 0) {
+      suggestions.push(
+        'Log eaten meals from your meal plan (or use demo seed data) to track micronutrients.',
+      );
+    }
+
+    return {
+      start,
+      end,
+      days,
+      daysWithIntake: dayCount,
+      targets: MICRONUTRIENT_RDA,
+      labels: MICRONUTRIENT_LABELS,
+      units: MICRONUTRIENT_UNITS,
+      avgDaily,
+      percentOfTarget,
+      deficiencies,
+      excesses,
+      suggestions: [...new Set(suggestions)].slice(0, 8),
+      foodsByNutrient: MICRONUTRIENT_FOOD_SUGGESTIONS,
     };
   }
 

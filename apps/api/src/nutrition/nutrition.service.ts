@@ -43,7 +43,7 @@ export class NutritionService {
       data.calorieTargetSource = dto.calorieTargetSource ?? 'manual';
     }
     if (dto.macroTargets !== undefined) {
-      data.macroTargets = dto.macroTargets as Prisma.InputJsonValue;
+      data.macroTargets = dto.macroTargets as unknown as Prisma.InputJsonValue;
     }
     if (dto.mealsPerDay !== undefined) data.mealsPerDay = dto.mealsPerDay;
     if (dto.snacksPerDay !== undefined) data.snacksPerDay = dto.snacksPerDay;
@@ -65,7 +65,9 @@ export class NutritionService {
           []) as Prisma.InputJsonValue,
         calorieTarget: dto.calorieTarget,
         calorieTargetSource: dto.calorieTargetSource,
-        macroTargets: dto.macroTargets as Prisma.InputJsonValue | undefined,
+        macroTargets: dto.macroTargets as unknown as
+          | Prisma.InputJsonValue
+          | undefined,
         mealsPerDay: dto.mealsPerDay ?? 3,
         snacksPerDay: dto.snacksPerDay ?? 0,
         preferredMealTimes: dto.preferredMealTimes as

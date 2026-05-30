@@ -6,6 +6,8 @@ import { GoalTracker } from './GoalTracker'
 import { InsightsHighlight } from './InsightsHighlight'
 import { ProgressChartsPanel } from './ProgressChartsPanel'
 import { WellnessGauge } from './WellnessGauge'
+import { NutritionDailyCompact } from '../nutrition/NutritionDailyCompact'
+import type { DailyAnalytics, TrendPoint, WeeklyAnalytics } from '../nutrition/types'
 import type { SummaryComponents } from './dashboardUtils'
 import { weightProgressPct } from './dashboardUtils'
 
@@ -47,8 +49,12 @@ export type HealthOverviewProps = {
   desiredActivityTargetDays: number | null
   fitnessGoalPrimary: string | null
   onViewInsights: () => void
+  onViewNutrition?: () => void
   quickActions?: ReactNode
-  nutritionTrend?: Array<{ date: string; calories: number; deficit: number }>
+  nutritionDaily?: DailyAnalytics | null
+  nutritionTrend?: TrendPoint[]
+  nutritionWeekly?: WeeklyAnalytics | null
+  nutritionInsightPreview?: string | null
 }
 
 export function HealthOverview({
@@ -66,8 +72,12 @@ export function HealthOverview({
   desiredActivityTargetDays,
   fitnessGoalPrimary,
   onViewInsights,
+  onViewNutrition,
   quickActions,
+  nutritionDaily = null,
   nutritionTrend = [],
+  nutritionWeekly = null,
+  nutritionInsightPreview = null,
 }: HealthOverviewProps) {
   const startingWeight =
     (weightSeries.find((p) => p.isBaseline) ?? weightSeries[0])?.weightKg ?? null
@@ -125,8 +135,14 @@ export function HealthOverview({
           targetActivityDays={desiredActivityTargetDays}
           weightSeries={weightSeries}
         />
+        <NutritionDailyCompact
+          daily={nutritionDaily}
+          busy={busy}
+          onViewNutrition={onViewNutrition}
+        />
         <InsightsHighlight
           insights={insights}
+          nutritionPreview={nutritionInsightPreview}
           bmiClass={summary?.bmiClassification ?? null}
           wellnessScore={summary?.wellnessScore ?? null}
           weeklyDays={latestActivityDays}
@@ -163,6 +179,8 @@ export function HealthOverview({
         fitnessGoalPrimary={fitnessGoalPrimary}
         progressSummary={progressSummary}
         nutritionTrend={nutritionTrend}
+        nutritionWeekly={nutritionWeekly}
+        onViewNutrition={onViewNutrition}
       />
     </div>
   )

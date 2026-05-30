@@ -10,7 +10,9 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { MacroTargetsDto } from './macro-targets.dto';
 
 export class NutritionProfileUpdateDto {
   @ApiPropertyOptional({ example: 'Europe/Helsinki' })
@@ -46,8 +48,9 @@ export class NutritionProfileUpdateDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsObject()
-  macroTargets?: { protein: number; carbs: number; fats: number };
+  @ValidateNested()
+  @Type(() => MacroTargetsDto)
+  macroTargets?: MacroTargetsDto;
 
   @ApiPropertyOptional()
   @IsOptional()

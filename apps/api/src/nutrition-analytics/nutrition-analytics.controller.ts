@@ -34,4 +34,14 @@ export class NutritionAnalyticsController {
   insights(@Req() req: AuthRequest, @Query('end') end?: string) {
     return this.analytics.aiInsights(req.user.userId, end);
   }
+
+  @Get('micronutrients')
+  micronutrients(
+    @Req() req: AuthRequest,
+    @Query('end') end?: string,
+    @Query('days') daysRaw?: string,
+  ) {
+    const days = Number(daysRaw ?? 7);
+    return this.analytics.micronutrientReport(req.user.userId, end, days);
+  }
 }

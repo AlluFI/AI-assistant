@@ -108,6 +108,10 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  RECIPE_MODERATOR_EMAILS?: string;
+
+  @IsString()
+  @IsOptional()
   ASSISTANT_MODEL?: string;
 
   @IsString()

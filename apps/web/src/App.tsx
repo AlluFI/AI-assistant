@@ -9,7 +9,15 @@ import {
 import { ACTIVITY_TYPES, type ActivityTypeOption } from './activityCatalog'
 import { HealthProfileForm } from './HealthProfileForm'
 import { NutritionPanel } from './nutrition/NutritionPanel'
-import type { TrendPoint } from './nutrition/types'
+import { NutritionInsightsSection } from './nutrition/NutritionInsightsSection'
+import type {
+  DailyAnalytics,
+  NutritionInsights,
+  TrendPoint,
+  WeeklyAnalytics,
+} from './nutrition/types'
+import { WingmanChat } from './wingman/WingmanChat'
+import './nutrition/nutrition.css'
 import { emptyProfileForm, profileFromApi, profileToPayload } from './profileFormModel'
 import {
   type PrivacySettingsForm,
@@ -22,82 +30,26 @@ import {
   parseRecommendations,
 } from './dashboard/dashboardUtils'
 import { devToolsEnabled } from './devTools'
-import { WingmanChat } from './wingman/WingmanChat'
 import {
-  clearLoginGreetingTemplate,
-  formatLoginGreeting,
-  pickLoginGreetingTemplate,
-  readLoginGreetingTemplate,
-  storeLoginGreetingTemplate,
-} from './loginGreeting'
-
-const apiBase = import.meta.env.VITE_API_BASE ?? '/api'
-const SUCCESS_MESSAGE_AUTO_DISMISS_MS = 4500
+  deviceTimezone,
+  isListedTimezone,
+  timezoneGroupsForSelect,
+} from './timezoneOptions'
+import { formatLoginGreeting } from './loginGreeting'
+import { apiPublicJson, getCookieValue, publicErrorMessage } from './lib/authApiClient'
+import { AuthPublicPages } from './auth/AuthPublicPages'
+import { AuthSignInPanel } from './auth/AuthSignInPanel'
+import { ConsentOnboardingModal } from './auth/ConsentOnboardingModal'
+import { pathHas } from './auth/authPaths'
+import { useAuthPublicFlows } from './auth/useAuthPublicFlows'
+import { useAuthSession } from './auth/useAuthSession'
+import { useSignInAuth } from './auth/useSignInAuth'
+import { AppToast } from './ui/AppToast'
 
 function todayDateInput() {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-const ALL_CONSENT_TYPES = [
-  'data_collection',
-  'ai_processing',
-  'analytics',
-  'marketing_email',
-] as const
-
-type AllConsentType = (typeof ALL_CONSENT_TYPES)[number]
-
-const CONSENT_ONBOARDING_COPY: Record<
-  AllConsentType,
-  { title: string; description: string }
-> = {
-  data_collection: {
-    title: 'Health and profile data',
-    description:
-      'Allows the app to store and use your demographics, measurements, activity, goals, and related inputs so you can use profiles, metrics, and analytics.',
-  },
-  ai_processing: {
-    title: 'AI-powered insights',
-    description:
-      'Allows optional use of your anonymized context to generate wellness insights and recommendations.',
-  },
-  analytics: {
-    title: 'Product analytics',
-    description:
-      'Allows aggregated or anonymized usage analytics to help improve the service.',
-  },
-  marketing_email: {
-    title: 'Product and tips email',
-    description:
-      'Allows occasional non-transactional emails about the product or wellness tips. You can change this later.',
-  },
-}
-
-type FetchConsentRecordsResult =
-  | { ok: true; records: Array<Record<string, unknown>> }
-  | { ok: false; status: number }
-
-async function fetchConsentRecords(token: string): Promise<FetchConsentRecordsResult> {
-  const res = await fetch(`${apiBase}/profile/consents?limit=200`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const body = await res.json().catch(() => ({}))
-  const records = Array.isArray(body.records) ? body.records : []
-  if (!res.ok) {
-    return { ok: false, status: res.status }
-  }
-  return { ok: true, records }
-}
-
-function needsConsentOnboarding(records: Array<Record<string, unknown>>): boolean {
-  const present = new Set<string>()
-  for (const r of records) {
-    const t = r.consentType
-    if (typeof t === 'string') present.add(t)
-  }
-  return ALL_CONSENT_TYPES.some((k) => !present.has(k))
 }
 
 type Point = {
@@ -132,47 +84,8 @@ type ProgressSummary = {
   wellnessDelta: number | null
 }
 
-function pathHas(segment: string) {
-  return window.location.pathname.includes(segment)
-}
-
-function readOAuthHash() {
-  const h = window.location.hash.replace(/^#/, '')
-  if (!h) return null
-  const p = new URLSearchParams(h)
-  const access = p.get('access_token')
-  const refresh = p.get('refresh_token')
-  if (access) return { access, refresh: refresh ?? null }
-  return null
-}
-
-function getCookieValue(name: string) {
-  const source = document.cookie
-  if (!source) return null
-  const item = source
-    .split(';')
-    .map((p) => p.trim())
-    .find((p) => p.startsWith(`${name}=`))
-  if (!item) return null
-  return decodeURIComponent(item.slice(name.length + 1))
-}
-
 export default function App() {
   const [health, setHealth] = useState<string>('…')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('')
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [mfaToken, setMfaToken] = useState<string | null>(null)
-  const [mfaCode, setMfaCode] = useState('')
-  const [mfaBackup, setMfaBackup] = useState('')
-  const [accessToken, setAccessToken] = useState<string | null>(() =>
-    sessionStorage.getItem('accessToken'),
-  )
-  const [refreshToken, setRefreshToken] = useState<string | null>(() =>
-    sessionStorage.getItem('refreshToken'),
-  )
   const [me, setMe] = useState<object | null>(null)
   const [summary, setSummary] = useState<object | null>(null)
   const [progressSummary, setProgressSummary] = useState<{
@@ -185,9 +98,10 @@ export default function App() {
   const [desiredActivityTargetDays, setDesiredActivityTargetDays] = useState<number | null>(null)
   const [chartDays, setChartDays] = useState(90)
   const [nutritionTrend, setNutritionTrend] = useState<TrendPoint[]>([])
-  const [loginGreetingTemplate, setLoginGreetingTemplate] = useState<string | null>(() =>
-    readLoginGreetingTemplate(),
-  )
+  const [nutritionDaily, setNutritionDaily] = useState<DailyAnalytics | null>(null)
+  const [nutritionWeekly, setNutritionWeekly] = useState<WeeklyAnalytics | null>(null)
+  const [nutritionInsights, setNutritionInsights] = useState<NutritionInsights | null>(null)
+  const [nutritionInsightsLoading, setNutritionInsightsLoading] = useState(false)
   const [insights, setInsights] = useState<Array<Record<string, unknown>>>([])
   const [insightCadence, setInsightCadence] = useState<'off' | 'daily' | 'weekly'>('off')
   const [weightReminderEnabled, setWeightReminderEnabled] = useState(true)
@@ -197,22 +111,14 @@ export default function App() {
   const [activityReminderDue, setActivityReminderDue] = useState(false)
   const [privacy, setPrivacy] = useState<PrivacySettingsForm | null>(null)
   const [consents, setConsents] = useState<Array<Record<string, unknown>>>([])
-  const [showConsentOnboarding, setShowConsentOnboarding] = useState(false)
-  const [onboardingGrants, setOnboardingGrants] = useState<Record<AllConsentType, boolean>>(() => ({
-    data_collection: false,
-    ai_processing: false,
-    analytics: false,
-    marketing_email: false,
-  }))
   const [exportEvents, setExportEvents] = useState<Array<Record<string, unknown>>>([])
   const [deletionRequest, setDeletionRequest] = useState<Record<string, unknown> | null>(null)
   const [deletionReason, setDeletionReason] = useState('')
   const [accountDisplayName, setAccountDisplayName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [targetWeightKg, setTargetWeightKg] = useState<number | null>(null)
-  const [profileTimezone, setProfileTimezone] = useState(
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-  )
+  const [profileTimezone, setProfileTimezone] = useState(deviceTimezone())
+  const [timezoneUseCustom, setTimezoneUseCustom] = useState(false)
 
   function applyProfileChartTargets(profile: Record<string, unknown> | null | undefined) {
     const p = profile ?? {}
@@ -227,19 +133,55 @@ export default function App() {
   const [hasStartingWeight, setHasStartingWeight] = useState(false)
   const [changingStartingWeight, setChangingStartingWeight] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [verifyEmailSuccess, setVerifyEmailSuccess] = useState<string | null>(null)
-  const [resetFlowSuccess, setResetFlowSuccess] = useState<string | null>(null)
-  const [emailChangeFlowSuccess, setEmailChangeFlowSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [showJson, setShowJson] = useState(false)
-  const [authAccordion, setAuthAccordion] = useState<
-    'email' | 'google' | 'github' | 'register' | null
-  >('email')
-  const [emailAuthMode, setEmailAuthMode] = useState<'login' | 'forgot'>('login')
-  const [nutritionShoppingListId, setNutritionShoppingListId] = useState<string | null>(
-    null,
-  )
+
+  const {
+    accessToken,
+    refreshToken,
+    authApi,
+    saveTokens,
+    clearTokens,
+    rotateLoginGreeting,
+    syncMeFromToken,
+    loginGreetingTemplate,
+    showConsentOnboarding,
+    onboardingGrants,
+    setOnboardingGrants,
+    submitConsentOnboarding,
+  } = useAuthSession({
+    setMe,
+    setAccountDisplayName,
+    setConsents,
+    setError,
+    setMessage,
+    setBusy,
+  })
+
+  const signIn = useSignInAuth({
+    setBusy,
+    setError,
+    setMessage,
+    setMe,
+    saveTokens,
+    rotateLoginGreeting,
+    syncMeFromToken,
+  })
+
+  const {
+    resetPath,
+    emailChangePath,
+    verifyEmailSuccess,
+    resetFlowSuccess,
+    emailChangeFlowSuccess,
+    resetPassword,
+    setResetPassword,
+    resetPasswordConfirm,
+    setResetPasswordConfirm,
+    submitReset,
+  } = useAuthPublicFlows({ setBusy, setError, setMessage })
+
   const [dashboardView, setDashboardView] = useState<
     'overview' | 'record' | 'insights' | 'nutrition' | 'profile' | 'account'
   >(
@@ -261,17 +203,6 @@ export default function App() {
     const stored = localStorage.getItem('theme')
     return stored === 'dark' ? 'dark' : 'light'
   })
-  const [resetToken] = useState<string | null>(() => {
-    if (!pathHas('reset-password')) return null
-    return new URLSearchParams(window.location.search).get('token')
-  })
-  const [emailChangeToken] = useState<string | null>(() => {
-    if (!pathHas('confirm-email-change')) return null
-    return new URLSearchParams(window.location.search).get('token')
-  })
-  const [resetPassword, setResetPassword] = useState('')
-  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
-  const [forgotEmail, setForgotEmail] = useState('')
   const [totpQrPayload, setTotpQrPayload] = useState<{
     qrDataUrl: string
     otpauthUrl: string
@@ -284,101 +215,13 @@ export default function App() {
   const [totpRegenPwd, setTotpRegenPwd] = useState('')
   const autoInsightTriggeredForCurrentView = useRef(false)
 
-  const saveTokens = useCallback((access: string, refresh: string | null) => {
-    sessionStorage.setItem('accessToken', access)
-    if (refresh) {
-      sessionStorage.setItem('refreshToken', refresh)
-    } else {
-      sessionStorage.removeItem('refreshToken')
-    }
-    setAccessToken(access)
-    setRefreshToken(refresh)
-  }, [])
-
-  const clearTokens = useCallback(() => {
-    sessionStorage.removeItem('accessToken')
-    sessionStorage.removeItem('refreshToken')
-    clearLoginGreetingTemplate()
-    setAccessToken(null)
-    setRefreshToken(null)
-    setLoginGreetingTemplate(null)
-    setShowConsentOnboarding(false)
-  }, [])
-
-  const rotateLoginGreeting = useCallback(() => {
-    const template = pickLoginGreetingTemplate()
-    storeLoginGreetingTemplate(template)
-    setLoginGreetingTemplate(template)
-  }, [])
-
-  const syncMeFromToken = useCallback(async (token: string) => {
-    const res = await fetch(`${apiBase}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const body = await res.json().catch(() => ({}))
-    if (res.ok) {
-      setMe(body)
-      setAccountDisplayName(typeof body.displayName === 'string' ? body.displayName : '')
-    }
-  }, [])
-
-  useEffect(() => {
-    const t = sessionStorage.getItem('accessToken')
-    if (t) void syncMeFromToken(t)
-  }, [syncMeFromToken])
-
-  useEffect(() => {
-    if (!accessToken) return
-    if (!readLoginGreetingTemplate()) rotateLoginGreeting()
-  }, [accessToken, rotateLoginGreeting])
-
-  useEffect(() => {
-    if (!accessToken) {
-      setShowConsentOnboarding(false)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        const result = await fetchConsentRecords(accessToken)
-        if (cancelled) return
-        if (!result.ok) {
-          if (result.status === 401) {
-            setError('Your session no longer matches this server (for example after a database reset). Please sign in again.')
-            clearTokens()
-          }
-          return
-        }
-        setConsents(result.records)
-        setShowConsentOnboarding(needsConsentOnboarding(result.records))
-      } catch {
-        if (!cancelled) setShowConsentOnboarding(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken, clearTokens])
-
   const overviewChartsLoaded = useRef(false)
   const trendsLoadSeq = useRef(0)
 
   useEffect(() => {
-    if (!showConsentOnboarding) return
-    setError(null)
-    setOnboardingGrants({
-      data_collection: false,
-      ai_processing: false,
-      analytics: false,
-      marketing_email: false,
-    })
-  }, [showConsentOnboarding])
-
-  useEffect(() => {
     if (!devToolsEnabled) return
-    fetch(`${apiBase}/health`)
-      .then((r) => r.json())
-      .then((j) => setHealth(JSON.stringify(j)))
+    void apiPublicJson('/health')
+      .then(({ data }) => setHealth(JSON.stringify(data)))
       .catch(() => setHealth('unreachable'))
   }, [])
 
@@ -387,123 +230,59 @@ export default function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
-  useEffect(() => {
-    if (authAccordion !== 'email') setEmailAuthMode('login')
-  }, [authAccordion])
-
-  useEffect(() => {
-    if (!message || mfaToken) return
-    const id = window.setTimeout(() => setMessage(null), SUCCESS_MESSAGE_AUTO_DISMISS_MS)
-    return () => window.clearTimeout(id)
-  }, [message, mfaToken])
-
-  useEffect(() => {
-    if (!verifyEmailSuccess) return
-    const id = window.setTimeout(() => setVerifyEmailSuccess(null), SUCCESS_MESSAGE_AUTO_DISMISS_MS)
-    return () => window.clearTimeout(id)
-  }, [verifyEmailSuccess])
-
-  useEffect(() => {
-    if (!resetFlowSuccess) return
-    const id = window.setTimeout(() => setResetFlowSuccess(null), SUCCESS_MESSAGE_AUTO_DISMISS_MS)
-    return () => window.clearTimeout(id)
-  }, [resetFlowSuccess])
-
-  useEffect(() => {
-    if (!emailChangeFlowSuccess) return
-    const id = window.setTimeout(
-      () => setEmailChangeFlowSuccess(null),
-      SUCCESS_MESSAGE_AUTO_DISMISS_MS,
-    )
-    return () => window.clearTimeout(id)
-  }, [emailChangeFlowSuccess])
-
-  useEffect(() => {
-    if (window.location.pathname.includes('oauth/callback')) {
-      const o = readOAuthHash()
-      if (o) {
-        saveTokens(o.access, o.refresh)
-        rotateLoginGreeting()
-        setMessage('Signed in with OAuth.')
-        window.history.replaceState({}, '', '/')
-        void fetch(`${apiBase}/auth/csrf`, {
-          headers: { Authorization: `Bearer ${o.access}` },
-        })
-        void syncMeFromToken(o.access)
-      }
+  const loadNutritionInsights = useCallback(async () => {
+    setNutritionInsightsLoading(true)
+    try {
+      const { data, response } = await authApi.request<NutritionInsights>(
+        '/nutrition-analytics/insights',
+      )
+      if (response.ok) setNutritionInsights(data)
+    } finally {
+      setNutritionInsightsLoading(false)
     }
-  }, [rotateLoginGreeting, saveTokens, syncMeFromToken])
-
-  const authFetch = useCallback(
-    async (path: string, init: RequestInit = {}) => {
-      const headers = new Headers(init.headers)
-      if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-      if (init.body && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json')
-      }
-      let res = await fetch(`${apiBase}${path}`, { ...init, headers })
-      if (res.status === 401 && (refreshToken || getCookieValue('csrf_token'))) {
-        const csrfToken = getCookieValue('csrf_token')
-        const r2 = await fetch(`${apiBase}/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-          },
-          body: JSON.stringify(refreshToken ? { refreshToken } : {}),
-        })
-        const b2 = await r2.json().catch(() => ({}))
-        if (r2.ok && b2.accessToken && b2.refreshToken) {
-          saveTokens(b2.accessToken, b2.refreshToken)
-          const h2 = new Headers(init.headers)
-          h2.set('Authorization', `Bearer ${b2.accessToken}`)
-          res = await fetch(`${apiBase}${path}`, { ...init, headers: h2 })
-        }
-      }
-      return res
-    },
-    [accessToken, refreshToken, saveTokens],
-  )
+  }, [authApi])
 
   const loadTrends = useCallback(
     async (days: number) => {
       const loadId = ++trendsLoadSeq.current
+      const today = todayDateInput()
       setBusy(true)
       setError(null)
       try {
-        const [wRes, wsRes, actRes, nutRes] = await Promise.all([
-          authFetch(`/analytics/series/weight?days=${days}`),
-          authFetch(`/analytics/series/wellness?days=${days}`),
-          authFetch(`/analytics/series/activity?days=${days}`),
-          authFetch(`/nutrition-analytics/trend?days=${days}`),
+        const [w, ws, act, nut, daily, weekly] = await Promise.all([
+          authApi.request<Point[]>(`/analytics/series/weight?days=${days}`),
+          authApi.request<Point[]>(`/analytics/series/wellness?days=${days}`),
+          authApi.request<unknown[]>(`/analytics/series/activity?days=${days}`),
+          authApi.request<TrendPoint[]>(`/nutrition-analytics/trend?days=${days}`),
+          authApi.request<DailyAnalytics>(`/nutrition-analytics/daily?date=${today}`),
+          authApi.request<WeeklyAnalytics>(`/nutrition-analytics/weekly?end=${today}`),
         ])
         if (loadId !== trendsLoadSeq.current) return
-        const wBody = await wRes.json().catch(() => [])
-        const wsBody = await wsRes.json().catch(() => [])
-        const actBody = await actRes.json().catch(() => [])
-        const nutBody = await nutRes.json().catch(() => [])
-        if (loadId !== trendsLoadSeq.current) return
-        if (!wRes.ok) {
-          setError(fmtErr(wBody, wRes))
+        if (!w.response.ok) {
+          setError(publicErrorMessage(w.data, w.response))
           return
         }
-        if (!wsRes.ok) {
-          setError(fmtErr(wsBody, wsRes))
+        if (!ws.response.ok) {
+          setError(publicErrorMessage(ws.data, ws.response))
           return
         }
-        if (!actRes.ok) {
-          setError(fmtErr(actBody, actRes))
+        if (!act.response.ok) {
+          setError(publicErrorMessage(act.data, act.response))
           return
         }
-        setWeightSeries(Array.isArray(wBody) ? wBody : [])
-        setWellnessSeries(Array.isArray(wsBody) ? wsBody : [])
-        setActivitySeries(Array.isArray(actBody) ? actBody : [])
-        if (nutRes.ok) setNutritionTrend(Array.isArray(nutBody) ? (nutBody as TrendPoint[]) : [])
+        setWeightSeries(Array.isArray(w.data) ? w.data : [])
+        setWellnessSeries(Array.isArray(ws.data) ? ws.data : [])
+        setActivitySeries(Array.isArray(act.data) ? (act.data as ActivityPoint[]) : [])
+        if (nut.response.ok) {
+          setNutritionTrend(Array.isArray(nut.data) ? nut.data : [])
+        }
+        if (daily.response.ok) setNutritionDaily(daily.data)
+        if (weekly.response.ok) setNutritionWeekly(weekly.data)
       } finally {
         if (loadId === trendsLoadSeq.current) setBusy(false)
       }
     },
-    [authFetch],
+    [authApi],
   )
 
   useEffect(() => {
@@ -513,6 +292,7 @@ export default function App() {
     void loadSummary()
     void loadProfile()
     void loadInsights()
+    void loadNutritionInsights()
   }, [accessToken, dashboardView])
 
   useEffect(() => {
@@ -538,7 +318,10 @@ export default function App() {
 
   useEffect(() => {
     if (!accessToken) return
-    if (dashboardView === 'insights') void loadInsights()
+    if (dashboardView === 'insights') {
+      void loadInsights()
+      void loadNutritionInsights()
+    }
     if (dashboardView === 'insights') void loadPrivacy()
     if (dashboardView === 'profile') {
       void loadProfile()
@@ -572,10 +355,11 @@ export default function App() {
 
   async function loadActivityCatalog() {
     try {
-      const res = await authFetch('/profile/activities/catalog')
-      const body = await res.json().catch(() => ({}))
-      if (res.ok && Array.isArray(body.activities) && body.activities.length) {
-        setActivityTypes(body.activities as ActivityTypeOption[])
+      const { data: body, response } = await authApi.request<{ activities?: ActivityTypeOption[] }>(
+        '/profile/activities/catalog',
+      )
+      if (response.ok && Array.isArray(body.activities) && body.activities.length) {
+        setActivityTypes(body.activities)
       }
     } catch {
       /* use bundled fallback */
@@ -586,22 +370,20 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const [mRes, aRes] = await Promise.all([
-        authFetch(`/profile/metrics?days=${days}&limit=200`),
-        authFetch(`/profile/activities?days=${days}&limit=200`),
+      const [m, a] = await Promise.all([
+        authApi.request<MetricEntry[]>(`/profile/metrics?days=${days}&limit=200`),
+        authApi.request<ActivityEntry[]>(`/profile/activities?days=${days}&limit=200`),
       ])
-      const mBody = await mRes.json().catch(() => [])
-      const aBody = await aRes.json().catch(() => [])
-      if (!mRes.ok) {
-        setError(fmtErr(mBody, mRes))
+      if (!m.response.ok) {
+        setError(publicErrorMessage(m.data, m.response))
         return
       }
-      if (!aRes.ok) {
-        setError(fmtErr(aBody, aRes))
+      if (!a.response.ok) {
+        setError(publicErrorMessage(a.data, a.response))
         return
       }
-      setMetricEntries(Array.isArray(mBody) ? mBody : [])
-      setActivityEntries(Array.isArray(aBody) ? aBody : [])
+      setMetricEntries(Array.isArray(m.data) ? m.data : [])
+      setActivityEntries(Array.isArray(a.data) ? a.data : [])
     } finally {
       setBusy(false)
     }
@@ -649,24 +431,17 @@ export default function App() {
     setError(null)
     try {
       const payload = { weightKg: w, recordedAt: recordWeightDate }
-      const res = editingMetricId
-        ? await authFetch(`/profile/metrics/${editingMetricId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(payload),
-          })
-        : await authFetch('/profile/metrics', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
+      if (editingMetricId) {
+        await authApi.patch(`/profile/metrics/${editingMetricId}`, payload)
+      } else {
+        await authApi.post('/profile/metrics', payload)
       }
       setMessage(editingMetricId ? 'Weight entry updated.' : 'Weight recorded.')
       resetRecordWeightForm()
       await loadRecordData(logDays)
       await Promise.all([loadSummary(), loadTrends(chartDays)])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save weight entry')
     } finally {
       setBusy(false)
     }
@@ -687,24 +462,17 @@ export default function App() {
         durationMinutes: duration,
         notes: recordActivityNotes.trim() || undefined,
       }
-      const res = editingActivityId
-        ? await authFetch(`/profile/activities/${editingActivityId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(payload),
-          })
-        : await authFetch('/profile/activities', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
+      if (editingActivityId) {
+        await authApi.patch(`/profile/activities/${editingActivityId}`, payload)
+      } else {
+        await authApi.post('/profile/activities', payload)
       }
       setMessage(editingActivityId ? 'Activity updated.' : 'Activity logged.')
       resetRecordActivityForm()
       await loadRecordData(logDays)
       await Promise.all([loadSummary(), loadTrends(chartDays)])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save activity')
     } finally {
       setBusy(false)
     }
@@ -715,16 +483,13 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch(`/profile/metrics/${id}`, { method: 'DELETE' })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      await authApi.delete(`/profile/metrics/${id}`)
       if (editingMetricId === id) resetRecordWeightForm()
       setMessage('Weight entry removed.')
       await loadRecordData(logDays)
       await Promise.all([loadSummary(), loadTrends(chartDays)])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove weight entry')
     } finally {
       setBusy(false)
     }
@@ -735,127 +500,14 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch(`/profile/activities/${id}`, { method: 'DELETE' })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      await authApi.delete(`/profile/activities/${id}`)
       if (editingActivityId === id) resetRecordActivityForm()
       setMessage('Activity removed.')
       await loadRecordData(logDays)
       await loadTrends(chartDays)
       await loadSummary()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const verify = useCallback(
-    async (token: string) => {
-      setBusy(true)
-      setError(null)
-      setMessage(null)
-      setVerifyEmailSuccess(null)
-      try {
-        const res = await fetch(`${apiBase}/auth/verify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          setError(fmtErr(body, res))
-          return
-        }
-        setVerifyEmailSuccess(body.message ?? 'Verified.')
-        window.history.replaceState({}, '', window.location.pathname)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [],
-  )
-
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('token')
-    if (t && pathHas('verify-email')) void verify(t)
-  }, [verify])
-
-  async function login(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    setMe(null)
-    setMfaToken(null)
-    try {
-      const res = await fetch(`${apiBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: loginEmail,
-          password: loginPassword,
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      if (body.mfaRequired && body.mfaToken) {
-        setMfaToken(body.mfaToken)
-        setMessage('Enter your authenticator code.')
-        return
-      }
-      if (body.accessToken && body.refreshToken) {
-        saveTokens(body.accessToken, body.refreshToken)
-        rotateLoginGreeting()
-        setMessage('Signed in.')
-        setLoginPassword('')
-        await fetch(`${apiBase}/auth/csrf`, {
-          headers: { Authorization: `Bearer ${body.accessToken}` },
-        })
-        void syncMeFromToken(body.accessToken)
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function completeMfa(e: React.FormEvent) {
-    e.preventDefault()
-    if (!mfaToken) return
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch(`${apiBase}/auth/mfa/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mfaToken,
-          totpCode: mfaCode || undefined,
-          backupCode: mfaBackup || undefined,
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      if (body.accessToken && body.refreshToken) {
-        saveTokens(body.accessToken, body.refreshToken)
-        rotateLoginGreeting()
-        setMfaToken(null)
-        setMfaCode('')
-        setMfaBackup('')
-        setMessage('Signed in.')
-        setLoginPassword('')
-        await fetch(`${apiBase}/auth/csrf`, {
-          headers: { Authorization: `Bearer ${body.accessToken}` },
-        })
-        void syncMeFromToken(body.accessToken)
-      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove activity')
     } finally {
       setBusy(false)
     }
@@ -865,18 +517,17 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const csrfToken = getCookieValue('csrf_token')
-      const res = await fetch(`${apiBase}/auth/refresh`, {
+      const csrfToken = getCookieValue('csrf_token') ?? undefined
+      const { response, data: body } = await apiPublicJson<{
+        accessToken?: string
+        refreshToken?: string
+      }>('/auth/refresh', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
-        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+        csrfToken,
+        body: refreshToken ? { refreshToken } : {},
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
+      if (!response.ok) {
+        setError(publicErrorMessage(body, response))
         return
       }
       if (body.accessToken && body.refreshToken) {
@@ -893,14 +544,11 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/me')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<Record<string, unknown>>('/auth/me')
       setMe(body)
       setAccountDisplayName(typeof body.displayName === 'string' ? body.displayName : '')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load account')
     } finally {
       setBusy(false)
     }
@@ -911,26 +559,16 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/account', {
-        method: 'PATCH',
-        body: JSON.stringify({ displayName: accountDisplayName }),
+      const body = await authApi.patch<{ user?: unknown }>('/auth/account', {
+        displayName: accountDisplayName,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      const tzRes = await authFetch('/nutrition/profile', {
-        method: 'PATCH',
-        body: JSON.stringify({ timezone: profileTimezone }),
+      await authApi.patch('/nutrition/profile', {
+        timezone: profileTimezone.trim() || 'UTC',
       })
-      if (!tzRes.ok) {
-        const tzBody = await tzRes.json().catch(() => ({}))
-        setError(fmtErr(tzBody, tzRes))
-        return
-      }
       setMe(body.user ?? me)
       setMessage('Account settings updated.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save account settings')
     } finally {
       setBusy(false)
     }
@@ -946,12 +584,12 @@ export default function App() {
     setError(null)
     setTotpShownBackups(null)
     try {
-      const res = await authFetch('/auth/totp/setup')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.post<{
+        qrDataUrl?: string
+        secret?: string
+        otpauthUrl?: string
+        expiresInSec?: number
+      }>('/auth/totp/setup')
       if (typeof body.qrDataUrl === 'string' && typeof body.secret === 'string') {
         setTotpQrPayload({
           qrDataUrl: body.qrDataUrl,
@@ -966,6 +604,8 @@ export default function App() {
       } else {
         setError('Unexpected response from server.')
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start 2FA setup')
     } finally {
       setBusy(false)
     }
@@ -977,15 +617,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/totp/confirm', {
-        method: 'POST',
-        body: JSON.stringify({ code: totpSetupCode }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.post<{ backupCodes?: unknown[]; message?: string }>(
+        '/auth/totp/confirm',
+        { code: totpSetupCode },
+      )
       clearTotpSetupUi()
       if (Array.isArray(body.backupCodes)) {
         setTotpShownBackups(
@@ -1001,6 +636,8 @@ export default function App() {
         (typeof body.message === 'string' ? body.message : null) ??
           'Two-factor authentication enabled. Other sessions were signed out; sign in again on other devices.',
       )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not confirm 2FA')
     } finally {
       setBusy(false)
     }
@@ -1011,15 +648,9 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/totp/disable', {
-        method: 'POST',
-        body: JSON.stringify({ password: totpDisablePwd }),
+      const body = await authApi.post<{ message?: string }>('/auth/totp/disable', {
+        password: totpDisablePwd,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
       setTotpDisablePwd('')
       setTotpShownBackups(null)
       clearTotpSetupUi()
@@ -1032,6 +663,8 @@ export default function App() {
         (typeof body.message === 'string' ? body.message : null) ??
           'Two-factor authentication disabled.',
       )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not disable 2FA')
     } finally {
       setBusy(false)
     }
@@ -1042,15 +675,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/totp/backup-codes/regenerate', {
-        method: 'POST',
-        body: JSON.stringify({ password: totpRegenPwd }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.post<{ backupCodes?: unknown[] }>(
+        '/auth/totp/backup-codes/regenerate',
+        { password: totpRegenPwd },
+      )
       setTotpRegenPwd('')
       if (Array.isArray(body.backupCodes)) {
         setTotpShownBackups(
@@ -1058,6 +686,8 @@ export default function App() {
         )
       }
       setMessage('New backup codes generated. Save them in a safe place; old codes no longer work.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not regenerate backup codes')
     } finally {
       setBusy(false)
     }
@@ -1068,17 +698,13 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/auth/change-email/request', {
-        method: 'POST',
-        body: JSON.stringify({ newEmail }),
+      const body = await authApi.post<{ message?: string }>('/auth/change-email/request', {
+        newEmail,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
       setMessage(body.message ?? 'Email change link sent.')
       setNewEmail('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not request email change')
     } finally {
       setBusy(false)
     }
@@ -1088,18 +714,17 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/analytics/summary')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<Record<string, unknown>>('/analytics/summary')
       setSummary(body)
-      const prRes = await authFetch('/analytics/summaries/progress')
-      const prBody = await prRes.json().catch(() => ({}))
+      const { data: prBody, response: prRes } = await authApi.request<{
+        weekly: ProgressSummary
+        monthly: ProgressSummary
+      }>('/analytics/summaries/progress')
       if (prRes.ok) {
-        setProgressSummary(prBody as { weekly: ProgressSummary; monthly: ProgressSummary })
+        setProgressSummary(prBody)
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load summary')
     } finally {
       setBusy(false)
     }
@@ -1109,13 +734,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/insights?limit=10')
-      const body = await res.json().catch(() => [])
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<Array<Record<string, unknown>>>('/insights?limit=10')
       setInsights(Array.isArray(body) ? body : [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load insights')
     } finally {
       setBusy(false)
     }
@@ -1125,18 +747,14 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/insights/generate', {
-        method: 'POST',
-        body: JSON.stringify({ historyDays }),
+      const body = await authApi.post<{ fallback?: boolean }>('/insights/generate', {
+        historyDays,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
       const mode = body?.fallback ? 'fallback' : 'AI'
       setMessage(`Generated ${mode} insight.`)
       await loadInsights()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not generate insight')
     } finally {
       setBusy(false)
     }
@@ -1169,16 +787,14 @@ export default function App() {
   async function refreshReminderStatus() {
     if (!accessToken) return
     try {
-      const [weightRes, activityRes] = await Promise.all([
-        authFetch('/profile/metrics?days=30&limit=1'),
-        authFetch('/profile/activities?days=7&limit=1'),
+      const [weight, activity] = await Promise.all([
+        authApi.request<MetricEntry[]>('/profile/metrics?days=30&limit=1'),
+        authApi.request<ActivityEntry[]>('/profile/activities?days=7&limit=1'),
       ])
-      const [weightBody, activityBody] = await Promise.all([
-        weightRes.json().catch(() => []),
-        activityRes.json().catch(() => []),
-      ])
-      const latestWeight = Array.isArray(weightBody) ? weightBody[0] : null
-      const latestActivity = Array.isArray(activityBody) ? activityBody[0] : null
+      const latestWeight =
+        weight.response.ok && Array.isArray(weight.data) ? weight.data[0] : null
+      const latestActivity =
+        activity.response.ok && Array.isArray(activity.data) ? activity.data[0] : null
       const weightAt = parseIsoDateSafe(latestWeight?.recordedAt)
       const activityAt = parseIsoDateSafe(latestActivity?.activityAt)
       setWeightReminderDue(
@@ -1201,12 +817,11 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<{
+        profile?: Record<string, unknown>
+        hasStartingWeight?: boolean
+        startingWeightKg?: number
+      }>('/profile')
       const profile = (body.profile ?? {}) as Record<string, unknown>
       setHasStartingWeight(Boolean(body.hasStartingWeight))
       setChangingStartingWeight(false)
@@ -1218,6 +833,8 @@ export default function App() {
         }),
       )
       applyProfileChartTargets(profile)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load profile')
     } finally {
       setBusy(false)
     }
@@ -1227,17 +844,19 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/nutrition/profile')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<{
+        nutritionProfile?: { timezone?: string }
+      }>('/nutrition/profile')
       const tz =
         typeof body?.nutritionProfile?.timezone === 'string'
           ? body.nutritionProfile.timezone
           : null
-      if (tz) setProfileTimezone(tz)
+      if (tz) {
+        setProfileTimezone(tz)
+        setTimezoneUseCustom(!isListedTimezone(tz))
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load nutrition settings')
     } finally {
       setBusy(false)
     }
@@ -1247,12 +866,7 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/privacy')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<{ settings?: unknown }>('/profile/privacy')
       const parsed = privacyFromApi(body.settings)
       setPrivacy(parsed)
       if (parsed) {
@@ -1261,6 +875,8 @@ export default function App() {
         setActivityReminderCadence(parsed.activityReminderCadence)
         setReminderChannel(parsed.reminderChannel)
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load privacy settings')
     } finally {
       setBusy(false)
     }
@@ -1271,17 +887,14 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/privacy', {
-        method: 'PATCH',
-        body: JSON.stringify(privacyToPayload(privacy)),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.patch<{ settings?: unknown }>(
+        '/profile/privacy',
+        privacyToPayload(privacy),
+      )
       setPrivacy(privacyFromApi(body.settings) ?? privacy)
       setMessage('Privacy settings saved.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save privacy settings')
     } finally {
       setBusy(false)
     }
@@ -1308,70 +921,13 @@ export default function App() {
     setActivityReminderCadence(merged.activityReminderCadence)
     setReminderChannel(merged.reminderChannel)
     try {
-      const res = await authFetch('/profile/privacy', {
-        method: 'PATCH',
-        body: JSON.stringify(merged),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.patch<{ settings?: unknown }>('/profile/privacy', merged)
       const parsed = privacyFromApi(body.settings)
       if (parsed) setPrivacy(parsed)
-    } catch {
-      setError('Could not save insight automation preferences')
-    }
-  }
-
-  async function submitConsentOnboarding(e: React.FormEvent) {
-    e.preventDefault()
-    if (!onboardingGrants.data_collection) {
+    } catch (e) {
       setError(
-        'Data collection consent is required to use profiles and health data in this app.',
+        e instanceof Error ? e.message : 'Could not save insight automation preferences',
       )
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      for (const ct of ALL_CONSENT_TYPES) {
-        const res = await authFetch('/profile/consents', {
-          method: 'POST',
-          body: JSON.stringify({
-            consentType: ct,
-            granted: onboardingGrants[ct],
-            source: 'initial_login',
-          }),
-        })
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          if (res.status === 401) clearTokens()
-          setError(
-            res.status === 401
-              ? 'Your session is no longer valid. Please sign in again.'
-              : fmtErr(body, res),
-          )
-          return
-        }
-      }
-      if (!accessToken) return
-      const result = await fetchConsentRecords(accessToken)
-      if (!result.ok) {
-        if (result.status === 401) clearTokens()
-        setError(
-          result.status === 401
-            ? 'Your session is no longer valid. Please sign in again.'
-            : 'Could not reload consent history.',
-        )
-        setShowConsentOnboarding(false)
-        return
-      }
-      setConsents(result.records)
-      setShowConsentOnboarding(false)
-      setMessage('Your consent choices have been saved.')
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -1379,13 +935,12 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/consents?limit=10')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<{ records?: Array<Record<string, unknown>> }>(
+        '/profile/consents?limit=10',
+      )
       setConsents(Array.isArray(body.records) ? body.records : [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load consents')
     } finally {
       setBusy(false)
     }
@@ -1395,12 +950,7 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/export')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.get<Record<string, unknown>>('/profile/export')
       const blob = new Blob([JSON.stringify(body, null, 2)], {
         type: 'application/json',
       })
@@ -1411,6 +961,8 @@ export default function App() {
       a.click()
       URL.revokeObjectURL(url)
       setMessage('Data export downloaded.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not export data')
     } finally {
       setBusy(false)
     }
@@ -1420,13 +972,12 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/export/events?limit=10')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setExportEvents(Array.isArray(body.events) ? body.events : [])
+      const body = await authApi.get<{ events?: unknown[] }>('/profile/export/events?limit=10')
+      setExportEvents(
+        Array.isArray(body.events) ? (body.events as Array<Record<string, unknown>>) : [],
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load export history')
     } finally {
       setBusy(false)
     }
@@ -1436,13 +987,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/deletion-request')
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setDeletionRequest(body.request ?? null)
+      const body = await authApi.get<{ request?: unknown }>('/profile/deletion-request')
+      setDeletionRequest((body.request as Record<string, unknown> | null) ?? null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load deletion status')
     } finally {
       setBusy(false)
     }
@@ -1452,75 +1000,96 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
+      const today = todayDateInput()
       const [
-        meRes,
-        summaryRes,
-        progressRes,
-        weightRes,
-        wellnessRes,
-        activityRes,
-        insightsRes,
-        profileRes,
-        privacyRes,
-        consentsRes,
-        exportEventsRes,
-        deletionRes,
+        me,
+        summary,
+        progress,
+        weight,
+        wellness,
+        activity,
+        insights,
+        profile,
+        privacy,
+        consents,
+        exportEvents,
+        deletion,
+        nutTrend,
+        nutDaily,
+        nutWeekly,
+        nutInsights,
       ] = await Promise.all([
-        authFetch('/auth/me'),
-        authFetch('/analytics/summary'),
-        authFetch('/analytics/summaries/progress'),
-        authFetch(`/analytics/series/weight?days=${chartDays}`),
-        authFetch(`/analytics/series/wellness?days=${chartDays}`),
-        authFetch(`/analytics/series/activity?days=${chartDays}`),
-        authFetch('/insights?limit=10'),
-        authFetch('/profile'),
-        authFetch('/profile/privacy'),
-        authFetch('/profile/consents?limit=10'),
-        authFetch('/profile/export/events?limit=10'),
-        authFetch('/profile/deletion-request'),
+        authApi.request<Record<string, unknown>>('/auth/me'),
+        authApi.request<Record<string, unknown>>('/analytics/summary'),
+        authApi.request<{ weekly: ProgressSummary; monthly: ProgressSummary }>(
+          '/analytics/summaries/progress',
+        ),
+        authApi.request<Point[]>(`/analytics/series/weight?days=${chartDays}`),
+        authApi.request<Point[]>(`/analytics/series/wellness?days=${chartDays}`),
+        authApi.request<unknown[]>(`/analytics/series/activity?days=${chartDays}`),
+        authApi.request<unknown[]>('/insights?limit=10'),
+        authApi.request<{ profile?: Record<string, unknown> }>('/profile'),
+        authApi.request<{ settings?: unknown }>('/profile/privacy'),
+        authApi.request<{ records?: unknown[] }>('/profile/consents?limit=10'),
+        authApi.request<{ events?: unknown[] }>('/profile/export/events?limit=10'),
+        authApi.request<{ request?: unknown }>('/profile/deletion-request'),
+        authApi.request<TrendPoint[]>(`/nutrition-analytics/trend?days=${chartDays}`),
+        authApi.request<DailyAnalytics>(`/nutrition-analytics/daily?date=${today}`),
+        authApi.request<WeeklyAnalytics>(`/nutrition-analytics/weekly?end=${today}`),
+        authApi.request<NutritionInsights>('/nutrition-analytics/insights'),
       ])
 
-      const parse = async (res: Response) => res.json().catch(() => ({}))
-      const [
-        meBody,
-        summaryBody,
-        progressBody,
-        weightBody,
-        wellnessBody,
-        activityBody,
-        insightsBody,
-        profileBody,
-        privacyBody,
-        consentsBody,
-        exportEventsBody,
-        deletionBody,
-      ] = await Promise.all([
-        parse(meRes),
-        parse(summaryRes),
-        parse(progressRes),
-        parse(weightRes),
-        parse(wellnessRes),
-        parse(activityRes),
-        parse(insightsRes),
-        parse(profileRes),
-        parse(privacyRes),
-        parse(consentsRes),
-        parse(exportEventsRes),
-        parse(deletionRes),
-      ])
+      if (!me.response.ok) return void setError(publicErrorMessage(me.data, me.response))
+      if (!summary.response.ok) {
+        return void setError(publicErrorMessage(summary.data, summary.response))
+      }
+      if (!progress.response.ok) {
+        return void setError(publicErrorMessage(progress.data, progress.response))
+      }
+      if (!weight.response.ok) {
+        return void setError(publicErrorMessage(weight.data, weight.response))
+      }
+      if (!wellness.response.ok) {
+        return void setError(publicErrorMessage(wellness.data, wellness.response))
+      }
+      if (!activity.response.ok) {
+        return void setError(publicErrorMessage(activity.data, activity.response))
+      }
+      if (!insights.response.ok) {
+        return void setError(publicErrorMessage(insights.data, insights.response))
+      }
+      if (!profile.response.ok) {
+        return void setError(publicErrorMessage(profile.data, profile.response))
+      }
+      if (!privacy.response.ok) {
+        return void setError(publicErrorMessage(privacy.data, privacy.response))
+      }
+      if (!consents.response.ok) {
+        return void setError(publicErrorMessage(consents.data, consents.response))
+      }
+      if (!exportEvents.response.ok) {
+        return void setError(publicErrorMessage(exportEvents.data, exportEvents.response))
+      }
+      if (!deletion.response.ok) {
+        return void setError(publicErrorMessage(deletion.data, deletion.response))
+      }
 
-      if (!meRes.ok) return void setError(fmtErr(meBody, meRes))
-      if (!summaryRes.ok) return void setError(fmtErr(summaryBody, summaryRes))
-      if (!progressRes.ok) return void setError(fmtErr(progressBody, progressRes))
-      if (!weightRes.ok) return void setError(fmtErr(weightBody, weightRes))
-      if (!wellnessRes.ok) return void setError(fmtErr(wellnessBody, wellnessRes))
-      if (!activityRes.ok) return void setError(fmtErr(activityBody, activityRes))
-      if (!insightsRes.ok) return void setError(fmtErr(insightsBody, insightsRes))
-      if (!profileRes.ok) return void setError(fmtErr(profileBody, profileRes))
-      if (!privacyRes.ok) return void setError(fmtErr(privacyBody, privacyRes))
-      if (!consentsRes.ok) return void setError(fmtErr(consentsBody, consentsRes))
-      if (!exportEventsRes.ok) return void setError(fmtErr(exportEventsBody, exportEventsRes))
-      if (!deletionRes.ok) return void setError(fmtErr(deletionBody, deletionRes))
+      const meBody = me.data
+      const summaryBody = summary.data
+      const progressBody = progress.data
+      const weightBody = weight.data
+      const wellnessBody = wellness.data
+      const activityBody = activity.data
+      const insightsBody = insights.data
+      const profileBody = profile.data
+      const privacyBody = privacy.data
+      const consentsBody = consents.data
+      const exportEventsBody = exportEvents.data
+      const deletionBody = deletion.data
+      const nutTrendBody = nutTrend.data
+      const nutDailyBody = nutDaily.data
+      const nutWeeklyBody = nutWeekly.data
+      const nutInsightsBody = nutInsights.data
 
       setMe(meBody)
       setAccountDisplayName(typeof meBody?.displayName === 'string' ? meBody.displayName : '')
@@ -1528,15 +1097,33 @@ export default function App() {
       setProgressSummary(progressBody as { weekly: ProgressSummary; monthly: ProgressSummary })
       setWeightSeries(Array.isArray(weightBody) ? weightBody : [])
       setWellnessSeries(Array.isArray(wellnessBody) ? wellnessBody : [])
-      setActivitySeries(Array.isArray(activityBody) ? activityBody : [])
-      setInsights(Array.isArray(insightsBody) ? insightsBody : [])
+      setActivitySeries(
+        Array.isArray(activityBody) ? (activityBody as ActivityPoint[]) : [],
+      )
+      setInsights(
+        Array.isArray(insightsBody) ? (insightsBody as Array<Record<string, unknown>>) : [],
+      )
+      if (nutTrend.response.ok) {
+        setNutritionTrend(Array.isArray(nutTrendBody) ? nutTrendBody : [])
+      }
+      if (nutDaily.response.ok) setNutritionDaily(nutDailyBody)
+      if (nutWeekly.response.ok) setNutritionWeekly(nutWeeklyBody)
+      if (nutInsights.response.ok) setNutritionInsights(nutInsightsBody)
       const demoProfile = (profileBody.profile ?? {}) as Record<string, unknown>
       setProfileForm(profileFromApi(demoProfile))
       applyProfileChartTargets(demoProfile)
       setPrivacy(privacyFromApi(privacyBody.settings))
-      setConsents(Array.isArray(consentsBody.records) ? consentsBody.records : [])
-      setExportEvents(Array.isArray(exportEventsBody.events) ? exportEventsBody.events : [])
-      setDeletionRequest(deletionBody.request ?? null)
+      setConsents(
+        Array.isArray(consentsBody.records)
+          ? (consentsBody.records as Array<Record<string, unknown>>)
+          : [],
+      )
+      setExportEvents(
+        Array.isArray(exportEventsBody.events)
+          ? (exportEventsBody.events as Array<Record<string, unknown>>)
+          : [],
+      )
+      setDeletionRequest((deletionBody.request as Record<string, unknown> | null) ?? null)
       setMessage('Demo overview loaded.')
     } finally {
       setBusy(false)
@@ -1548,19 +1135,13 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/deletion-request', {
-        method: 'POST',
-        body: JSON.stringify({
-          reason: deletionReason || undefined,
-        }),
+      const body = await authApi.post<{ request?: unknown }>('/profile/deletion-request', {
+        reason: deletionReason || undefined,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setDeletionRequest(body.request ?? null)
+      setDeletionRequest((body.request as Record<string, unknown> | null) ?? null)
       setMessage('Deletion request submitted.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not submit deletion request')
     } finally {
       setBusy(false)
     }
@@ -1570,16 +1151,13 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/deletion-request/cancel', {
-        method: 'POST',
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setDeletionRequest(body.request ?? null)
+      const body = await authApi.post<{ request?: unknown }>(
+        '/profile/deletion-request/cancel',
+      )
+      setDeletionRequest((body.request as Record<string, unknown> | null) ?? null)
       setMessage('Deletion request cancelled.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not cancel deletion request')
     } finally {
       setBusy(false)
     }
@@ -1606,15 +1184,10 @@ export default function App() {
     setBusy(true)
     setError(null)
     try {
-      const res = await authFetch('/profile/reset-starting-weight', {
-        method: 'POST',
-        body: JSON.stringify({ startingWeightKg }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.post<{
+        profile?: Record<string, unknown>
+        startingWeightKg?: number
+      }>('/profile/reset-starting-weight', { startingWeightKg })
       setMessage(
         `Starting weight updated to ${startingWeightKg} kg. Historical metrics and activities were cleared.`,
       )
@@ -1630,6 +1203,8 @@ export default function App() {
       )
       applyProfileChartTargets(saved)
       await Promise.all([loadSummary(), loadTrends(chartDays), loadRecordData(logDays)])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reset starting weight')
     } finally {
       setBusy(false)
     }
@@ -1647,15 +1222,11 @@ export default function App() {
       const data = profileToPayload(profileForm, {
         includeStartingWeight: !hasStartingWeight,
       })
-      const res = await authFetch('/profile', {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
+      const body = await authApi.patch<{
+        profile?: Record<string, unknown>
+        hasStartingWeight?: boolean
+        startingWeightKg?: number
+      }>('/profile', data)
       setMessage('Profile saved.')
       setHasStartingWeight(Boolean(body.hasStartingWeight))
       const saved = (body.profile ?? {}) as Record<string, unknown>
@@ -1670,6 +1241,8 @@ export default function App() {
       if (dashboardView === 'overview') {
         await Promise.all([loadSummary(), loadTrends(chartDays)])
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save profile')
     } finally {
       setBusy(false)
     }
@@ -1678,10 +1251,9 @@ export default function App() {
   async function logout() {
     if (refreshToken) {
       try {
-        await fetch(`${apiBase}/auth/logout`, {
+        await apiPublicJson('/auth/logout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
+          body: { refreshToken },
         })
       } catch {
         /* ignore */
@@ -1701,7 +1273,7 @@ export default function App() {
   async function logoutAll() {
     setBusy(true)
     try {
-      await authFetch('/auth/logout-all', { method: 'POST' })
+      await authApi.post('/auth/logout-all')
       clearTokens()
       setMe(null)
       setSummary(null)
@@ -1716,122 +1288,6 @@ export default function App() {
     }
   }
 
-  async function register(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      if (password !== registerPasswordConfirm) {
-        setError('Passwords do not match.')
-        return
-      }
-      const res = await fetch(`${apiBase}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setMessage(body.message ?? 'Registered.')
-      setPassword('')
-      setRegisterPasswordConfirm('')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function forgotPassword(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch(`${apiBase}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setMessage(body.message ?? 'Check your email.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function submitReset(e: React.FormEvent) {
-    e.preventDefault()
-    if (!resetToken) return
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      if (resetPassword !== resetPasswordConfirm) {
-        setError('Passwords do not match.')
-        return
-      }
-      const res = await fetch(`${apiBase}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: resetToken, password: resetPassword }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(fmtErr(body, res))
-        return
-      }
-      setMessage(null)
-      setResetFlowSuccess(body.message ?? 'Password updated.')
-      setResetPassword('')
-      setResetPasswordConfirm('')
-      window.history.replaceState({}, '', '/')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const confirmEmailChange = useCallback(
-    async (token: string) => {
-      setBusy(true)
-      setError(null)
-      setMessage(null)
-      try {
-        const res = await fetch(`${apiBase}/auth/change-email/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          setError(fmtErr(body, res))
-          return
-        }
-        setMessage(null)
-        setEmailChangeFlowSuccess(body.message ?? 'Email updated.')
-        window.history.replaceState({}, '', '/')
-      } finally {
-        setBusy(false)
-      }
-    },
-    [],
-  )
-
-  useEffect(() => {
-    if (emailChangeToken && pathHas('confirm-email-change')) {
-      void confirmEmailChange(emailChangeToken)
-    }
-  }, [confirmEmailChange, emailChangeToken])
-
-  const resetPath =
-    window.location.pathname.includes('reset-password') || resetToken
-  const emailChangePath =
-    window.location.pathname.includes('confirm-email-change') || emailChangeToken
   const meObj = me as { email?: string; displayName?: string; totpEnabled?: boolean } | null
   const dashboardGreeting =
     accessToken && loginGreetingTemplate
@@ -1869,335 +1325,48 @@ export default function App() {
         </div>
       </header>
 
+      <AppToast
+        message={message}
+        error={error}
+        onDismissMessage={() => setMessage(null)}
+        onDismissError={() => setError(null)}
+        hidden={
+          !!signIn.mfaToken ||
+          pathHas('verify-email') ||
+          resetPath ||
+          emailChangePath ||
+          !!(accessToken && showConsentOnboarding)
+        }
+      />
+
       <main className="main">
-        {pathHas('verify-email') ? (
-          <section className="card">
-            <h2>Email verification</h2>
-            {busy && <p>Verifying…</p>}
-            {!busy && verifyEmailSuccess && <p className="ok">{verifyEmailSuccess}</p>}
-            {!busy && error && <p className="err">{error}</p>}
-          </section>
-        ) : null}
+        <AuthPublicPages
+          busy={busy}
+          error={error}
+          verifyEmailSuccess={verifyEmailSuccess}
+          resetPath={resetPath}
+          emailChangePath={emailChangePath}
+          resetPassword={resetPassword}
+          setResetPassword={setResetPassword}
+          resetPasswordConfirm={resetPasswordConfirm}
+          setResetPasswordConfirm={setResetPasswordConfirm}
+          resetFlowSuccess={resetFlowSuccess}
+          emailChangeFlowSuccess={emailChangeFlowSuccess}
+          submitReset={submitReset}
+        />
 
-        {resetPath ? (
-          <section className="card">
-            <h2>Reset password</h2>
-            <form onSubmit={submitReset} className="form">
-              <label>
-                New password (min 10)
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={resetPassword}
-                  onChange={(e) => setResetPassword(e.target.value)}
-                  minLength={10}
-                  required
-                />
-              </label>
-              <label>
-                Re-enter new password
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  value={resetPasswordConfirm}
-                  onChange={(e) => setResetPasswordConfirm(e.target.value)}
-                  minLength={10}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={busy}>
-                Update password
-              </button>
-            </form>
-            {resetFlowSuccess ? <p className="ok">{resetFlowSuccess}</p> : null}
-            {error ? <p className="err">{error}</p> : null}
-          </section>
-        ) : null}
-
-        {emailChangePath ? (
-          <section className="card">
-            <h2>Email change confirmation</h2>
-            {busy && <p>Confirming…</p>}
-            {!busy && emailChangeFlowSuccess && <p className="ok">{emailChangeFlowSuccess}</p>}
-            {!busy && error && <p className="err">{error}</p>}
-          </section>
-        ) : null}
-
-        {!accessToken ? (
-          <section className="card">
-            <div className="authPanel">
-              {mfaToken ? (
-                <form onSubmit={completeMfa} className="form">
-                  <label>
-                    Authenticator code (6 digits)
-                    <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} maxLength={6} />
-                  </label>
-                  <label>
-                    Or backup code
-                    <input value={mfaBackup} onChange={(e) => setMfaBackup(e.target.value)} />
-                  </label>
-                  <button type="submit" disabled={busy}>
-                    Complete sign-in
-                  </button>
-                </form>
-              ) : (
-                <div className="authAccordion">
-                  <div className={`authAccordionItem${authAccordion === 'email' ? ' open' : ''}`}>
-                    <button
-                      type="button"
-                      className="authAccordionHead"
-                      aria-expanded={authAccordion === 'email'}
-                      onClick={() =>
-                        setAuthAccordion((p) => {
-                          const next = p === 'email' ? null : 'email'
-                          return next
-                        })
-                      }
-                    >
-                      <span>Email</span>
-                      <span className="authAccordionChevron" aria-hidden>
-                        {authAccordion === 'email' ? '▼' : '▶'}
-                      </span>
-                    </button>
-                    {authAccordion === 'email' ? (
-                      <div className="authAccordionBody">
-                        {emailAuthMode === 'login' ? (
-                          <form onSubmit={login} className="form">
-                            <label>
-                              Email
-                              <input
-                                type="email"
-                                autoComplete="email"
-                                value={loginEmail}
-                                onChange={(e) => setLoginEmail(e.target.value)}
-                                required
-                              />
-                            </label>
-                            <label>
-                              Password
-                              <input
-                                type="password"
-                                autoComplete="current-password"
-                                value={loginPassword}
-                                onChange={(e) => setLoginPassword(e.target.value)}
-                                required
-                              />
-                            </label>
-                            <button type="submit" disabled={busy}>
-                              Sign in
-                            </button>
-                            <div className="signInFooter">
-                              <button
-                                type="button"
-                                className="linkLike"
-                                onClick={() => setEmailAuthMode('forgot')}
-                              >
-                                Forgot password?
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <form onSubmit={forgotPassword} className="form">
-                            <label>
-                              Email
-                              <input
-                                type="email"
-                                value={forgotEmail}
-                                onChange={(e) => setForgotEmail(e.target.value)}
-                                required
-                              />
-                            </label>
-                            <button type="submit" disabled={busy}>
-                              Send reset link
-                            </button>
-                            <div className="signInFooter">
-                              <button
-                                type="button"
-                                className="linkLike"
-                                onClick={() => setEmailAuthMode('login')}
-                              >
-                                Back to sign in
-                              </button>
-                            </div>
-                          </form>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className={`authAccordionItem${authAccordion === 'google' ? ' open' : ''}`}>
-                    <button
-                      type="button"
-                      className="authAccordionHead"
-                      aria-expanded={authAccordion === 'google'}
-                      onClick={() =>
-                        setAuthAccordion((p) => (p === 'google' ? null : 'google'))
-                      }
-                    >
-                      <span>Google</span>
-                      <span className="authAccordionChevron" aria-hidden>
-                        {authAccordion === 'google' ? '▼' : '▶'}
-                      </span>
-                    </button>
-                    {authAccordion === 'google' ? (
-                      <div className="authAccordionBody">
-                        <p className="hint oauthAccordionHint">
-                          Continue in your browser. You will return here after signing in with Google.
-                        </p>
-                        <a className="oauthContinue" href={`${apiBase}/auth/google`}>
-                          Continue with Google
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className={`authAccordionItem${authAccordion === 'github' ? ' open' : ''}`}>
-                    <button
-                      type="button"
-                      className="authAccordionHead"
-                      aria-expanded={authAccordion === 'github'}
-                      onClick={() =>
-                        setAuthAccordion((p) => (p === 'github' ? null : 'github'))
-                      }
-                    >
-                      <span>GitHub</span>
-                      <span className="authAccordionChevron" aria-hidden>
-                        {authAccordion === 'github' ? '▼' : '▶'}
-                      </span>
-                    </button>
-                    {authAccordion === 'github' ? (
-                      <div className="authAccordionBody">
-                        <p className="hint oauthAccordionHint">
-                          Continue in your browser. You will return here after signing in with GitHub.
-                        </p>
-                        <a className="oauthContinue" href={`${apiBase}/auth/github`}>
-                          Continue with GitHub
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className={`authAccordionItem${authAccordion === 'register' ? ' open' : ''}`}>
-                    <button
-                      type="button"
-                      className="authAccordionHead"
-                      aria-expanded={authAccordion === 'register'}
-                      onClick={() =>
-                        setAuthAccordion((p) => (p === 'register' ? null : 'register'))
-                      }
-                    >
-                      <span>Create account</span>
-                      <span className="authAccordionChevron" aria-hidden>
-                        {authAccordion === 'register' ? '▼' : '▶'}
-                      </span>
-                    </button>
-                    {authAccordion === 'register' ? (
-                      <div className="authAccordionBody">
-                        <form onSubmit={register} className="form">
-                          <label>
-                            Email
-                            <input
-                              type="email"
-                              autoComplete="email"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              required
-                            />
-                          </label>
-                          <label>
-                            Password (min 10 characters)
-                            <input
-                              type="password"
-                              autoComplete="new-password"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              minLength={10}
-                              required
-                            />
-                          </label>
-                          <label>
-                            Re-enter password
-                            <input
-                              type="password"
-                              autoComplete="new-password"
-                              value={registerPasswordConfirm}
-                              onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
-                              minLength={10}
-                              required
-                            />
-                          </label>
-                          <button type="submit" disabled={busy}>
-                            Register
-                          </button>
-                        </form>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        ) : null}
+        {!accessToken ? <AuthSignInPanel busy={busy} {...signIn} /> : null}
 
         {accessToken ? (
           <>
             {showConsentOnboarding ? (
-              <div
-                className="consentModalBackdrop"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="consent-onboarding-title"
-              >
-                <div className="consentModalCard card">
-                  <h2 id="consent-onboarding-title">Review your consents</h2>
-                  <p className="hint">
-                    Before you continue, please confirm how we may use your information. You can update
-                    these choices later under Privacy.
-                  </p>
-                  {error ? <p className="err">{error}</p> : null}
-                  <form onSubmit={submitConsentOnboarding} className="form consentOnboardingForm">
-                    {ALL_CONSENT_TYPES.map((ct) => (
-                      <div key={ct} className="consentOnboardingBlock">
-                        <label className="consentOnboardingLabel">
-                          <input
-                            type="checkbox"
-                            checked={onboardingGrants[ct]}
-                            onChange={(e) =>
-                              setOnboardingGrants((g) => ({ ...g, [ct]: e.target.checked }))
-                            }
-                          />
-                          <span>
-                            <strong>{CONSENT_ONBOARDING_COPY[ct].title}</strong>
-                            <span className="consentOnboardingDesc">
-                              {CONSENT_ONBOARDING_COPY[ct].description}
-                            </span>
-                          </span>
-                        </label>
-                      </div>
-                    ))}
-                    <div className="row consentOnboardingActions">
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy}
-                        onClick={() =>
-                          setOnboardingGrants({
-                            data_collection: true,
-                            ai_processing: true,
-                            analytics: true,
-                            marketing_email: true,
-                          })
-                        }
-                      >
-                        Grant all
-                      </button>
-                      <button type="submit" disabled={busy}>
-                        Save choices
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
+              <ConsentOnboardingModal
+                busy={busy}
+                error={error}
+                onboardingGrants={onboardingGrants}
+                setOnboardingGrants={setOnboardingGrants}
+                onSubmit={submitConsentOnboarding}
+              />
             ) : null}
 
             <section className="card dashboardTop">
@@ -2304,7 +1473,15 @@ export default function App() {
                 desiredActivityTargetDays={desiredActivityTargetDays}
                 fitnessGoalPrimary={profileForm.fitnessGoalPrimary || null}
                 nutritionTrend={nutritionTrend}
+                nutritionDaily={nutritionDaily}
+                nutritionWeekly={nutritionWeekly}
+                nutritionInsightPreview={
+                  nutritionInsights?.achievements[0] ??
+                  nutritionInsights?.suggestions[0] ??
+                  null
+                }
                 onViewInsights={() => setDashboardView('insights')}
+                onViewNutrition={() => setDashboardView('nutrition')}
                 quickActions={
                   devToolsEnabled ? (
                   <section className="card cardSpan2">
@@ -2386,74 +1563,113 @@ export default function App() {
             ) : null}
 
             {dashboardView === 'insights' ? (
-              <section className="card cardWide">
-                <h2>AI insights</h2>
-                <p className="hint">
-                  Auto insights cadence
-                  <select
-                    value={insightCadence}
-                    onChange={(e) =>
-                      void saveInsightAutomationPrefs({
-                        insightCadence: e.target.value as 'off' | 'daily' | 'weekly',
-                      })
-                    }
-                    disabled={busy}
-                    style={{ marginLeft: '0.5rem' }}
-                  >
-                    <option value="off">Off</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
-                </p>
-                <div className="row">
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() =>
-                      void generateInsight(insightCadence === 'daily' ? 7 : 30)
-                    }
-                    disabled={busy}
-                  >
-                    Generate insight
-                  </button>
-                  {devToolsEnabled ? (
-                    <button type="button" className="secondary" onClick={() => void loadInsights()} disabled={busy}>
-                      Load recent insights
+              <div className="insightsGrouped">
+                <section className="card cardWide">
+                  <h2>AI insights</h2>
+                  <p className="hint">
+                    Wellness and nutrition analysis in one place. Auto-generate wellness insights below;
+                    nutrition highlights refresh from your meal plans and logged intake.
+                  </p>
+                </section>
+
+                <section className="card cardWide insightsSection">
+                  <h2>Wellness &amp; lifestyle</h2>
+                  <p className="hint">
+                    Auto insights cadence
+                    <select
+                      value={insightCadence}
+                      onChange={(e) =>
+                        void saveInsightAutomationPrefs({
+                          insightCadence: e.target.value as 'off' | 'daily' | 'weekly',
+                        })
+                      }
+                      disabled={busy}
+                      style={{ marginLeft: '0.5rem' }}
+                    >
+                      <option value="off">Off</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                    </select>
+                  </p>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() =>
+                        void generateInsight(insightCadence === 'daily' ? 7 : 30)
+                      }
+                      disabled={busy}
+                    >
+                      Generate wellness insight
                     </button>
-                  ) : null}
-                </div>
-                {insights.length ? (
-                  <div className="insights">
-                    {insights.map((item, idx) => (
-                      <div className="insight" key={String(item.id ?? idx)}>
-                        <p className="insightMeta">
-                          {item.createdAt ? fmtDateTime(item.createdAt) : '—'} · {String(item.model ?? '')}
-                          {item.degraded ? ' · fallback' : ''}
-                        </p>
-                        <p className="insightSummary">{String(item.summary ?? '')}</p>
-                        {parseRecommendations(item.recommendations).length ? (
-                          <div className="recommendationList">
-                            {parseRecommendations(item.recommendations).map((rec, rIdx) => (
-                              <details key={`${String(item.id ?? idx)}-${rIdx}`} className="recommendationItem">
-                                <summary>
-                                  <span className={`priorityBadge ${rec.priority}`}>{rec.priority}</span>
-                                  <span>{rec.title}</span>
-                                </summary>
-                                <p>{rec.detail}</p>
-                              </details>
-                            ))}
-                          </div>
-                        ) : null}
-                        {devToolsEnabled && showJson ? (
-                          <pre className="pre">{JSON.stringify(item.recommendations ?? [], null, 2)}</pre>
-                        ) : null}
-                      </div>
-                    ))}
+                    {devToolsEnabled ? (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => void loadInsights()}
+                        disabled={busy}
+                      >
+                        Load recent wellness insights
+                      </button>
+                    ) : null}
                   </div>
-                ) : (
-                  <p className="hint">No insights loaded yet.</p>
-                )}
-              </section>
+                  {insights.length ? (
+                    <div className="insights">
+                      {insights.map((item, idx) => (
+                        <div className="insight" key={String(item.id ?? idx)}>
+                          <p className="insightMeta">
+                            {item.createdAt ? fmtDateTime(item.createdAt) : '—'} · {String(item.model ?? '')}
+                            {item.degraded ? ' · fallback' : ''}
+                          </p>
+                          <p className="insightSummary">{String(item.summary ?? '')}</p>
+                          {parseRecommendations(item.recommendations).length ? (
+                            <div className="recommendationList">
+                              {parseRecommendations(item.recommendations).map((rec, rIdx) => (
+                                <details
+                                  key={`${String(item.id ?? idx)}-${rIdx}`}
+                                  className="recommendationItem"
+                                >
+                                  <summary>
+                                    <span className={`priorityBadge ${rec.priority}`}>{rec.priority}</span>
+                                    <span>{rec.title}</span>
+                                  </summary>
+                                  <p>{rec.detail}</p>
+                                </details>
+                              ))}
+                            </div>
+                          ) : null}
+                          {devToolsEnabled && showJson ? (
+                            <pre className="pre">{JSON.stringify(item.recommendations ?? [], null, 2)}</pre>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="hint">No wellness insights yet. Generate one to see recommendations.</p>
+                  )}
+                </section>
+
+                <section className="card cardWide insightsSection">
+                  <div className="chartPanelHead">
+                    <h2>Nutrition analysis</h2>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => void loadNutritionInsights()}
+                      disabled={busy || nutritionInsightsLoading}
+                    >
+                      Refresh nutrition insights
+                    </button>
+                  </div>
+                  <p className="hint">
+                    Macro balance, achievements, and meal-plan suggestions based on your logged intake.
+                  </p>
+                  <NutritionInsightsSection
+                    insights={nutritionInsights}
+                    loading={nutritionInsightsLoading}
+                  />
+                </section>
+              </div>
             ) : null}
 
             {dashboardView === 'nutrition' && accessToken ? (
@@ -2464,8 +1680,6 @@ export default function App() {
                 setMessage={setMessage}
                 setError={setError}
                 onOpenWellnessInsights={() => setDashboardView('insights')}
-                openShoppingListId={nutritionShoppingListId}
-                onShoppingListOpened={() => setNutritionShoppingListId(null)}
               />
             ) : null}
 
@@ -2548,15 +1762,84 @@ export default function App() {
                     <pre className="pre">{JSON.stringify(me, null, 2)}</pre>
                   ) : null}
                   <form onSubmit={saveAccountSettings} className="form">
-                    <label>
-                      Timezone
-                      <input
-                        value={profileTimezone}
-                        onChange={(e) => setProfileTimezone(e.target.value)}
-                        disabled={busy}
-                        placeholder="e.g. Europe/Helsinki"
-                      />
-                    </label>
+                    <div className="timezoneFieldBlock">
+                      <label htmlFor="profile-timezone">
+                        Timezone
+                        {!timezoneUseCustom ? (
+                          <select
+                            id="profile-timezone"
+                            value={isListedTimezone(profileTimezone) ? profileTimezone : ''}
+                            disabled={busy}
+                            onChange={(e) => {
+                              const next = e.target.value
+                              if (next === '__custom__') {
+                                setTimezoneUseCustom(true)
+                                return
+                              }
+                              setProfileTimezone(next)
+                            }}
+                          >
+                            <option value="">Select timezone…</option>
+                            {timezoneGroupsForSelect(profileTimezone).map((group) => (
+                              <optgroup key={group.label} label={group.label}>
+                                {group.zones.map((zone) => (
+                                  <option key={zone} value={zone}>
+                                    {zone}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                            <option value="__custom__">Other (enter IANA name)…</option>
+                          </select>
+                        ) : (
+                          <input
+                            id="profile-timezone"
+                            value={profileTimezone}
+                            onChange={(e) => setProfileTimezone(e.target.value)}
+                            disabled={busy}
+                            placeholder="e.g. Europe/Helsinki"
+                            list="profile-timezone-suggestions"
+                          />
+                        )}
+                      </label>
+                      <datalist id="profile-timezone-suggestions">
+                        {timezoneGroupsForSelect(profileTimezone).flatMap((g) =>
+                          g.zones.map((zone) => <option key={zone} value={zone} />),
+                        )}
+                      </datalist>
+                      <p className="hint timezoneFieldHint">
+                        Used for meal plan scheduling and nutrition day boundaries. Choose your
+                        city region (IANA format, e.g. <code>Europe/Helsinki</code>).
+                      </p>
+                      <div className="row timezoneFieldActions">
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => {
+                            setProfileTimezone(deviceTimezone())
+                            setTimezoneUseCustom(!isListedTimezone(deviceTimezone()))
+                          }}
+                        >
+                          Use my device timezone
+                        </button>
+                        {timezoneUseCustom ? (
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              setTimezoneUseCustom(false)
+                              if (!isListedTimezone(profileTimezone)) {
+                                setProfileTimezone(deviceTimezone())
+                              }
+                            }}
+                          >
+                            Choose from list
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                     <label>
                       Display name
                       <input
@@ -2866,21 +2149,11 @@ export default function App() {
           </>
         ) : null}
 
-        {message && !pathHas('verify-email') && !resetPath && !emailChangePath ? (
-          <p className="ok banner">{message}</p>
-        ) : null}
-        {error &&
-        !pathHas('verify-email') &&
-        !resetPath &&
-        !emailChangePath &&
-        !(accessToken && showConsentOnboarding) ? (
-          <p className="err banner">{error}</p>
-        ) : null}
       </main>
 
       {accessToken && !showConsentOnboarding ? (
         <WingmanChat
-          authFetch={authFetch}
+          authFetch={authApi.fetch}
           showReminderDot={
             (weightReminderEnabled && weightReminderDue) ||
             (activityReminderCadence !== 'off' && activityReminderDue)
@@ -2888,11 +2161,8 @@ export default function App() {
           onOpenRecord={() => {
             setDashboardView('record')
           }}
-          onOpenNutrition={(opts) => {
+          onOpenNutrition={() => {
             setDashboardView('nutrition')
-            if (opts?.shoppingListId) {
-              setNutritionShoppingListId(opts.shoppingListId)
-            }
           }}
           onOpenInsights={() => {
             setDashboardView('insights')
@@ -2906,11 +2176,3 @@ export default function App() {
     </div>
   )
 }
-
-function fmtErr(body: { message?: unknown }, res: Response) {
-  const m = body.message
-  if (Array.isArray(m)) return m.join(', ')
-  if (typeof m === 'string') return m
-  return res.statusText
-}
-

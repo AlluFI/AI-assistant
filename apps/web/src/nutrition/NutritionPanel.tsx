@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MealPhotoLog } from './MealPhotoLog'
 import { NutritionCharts } from './NutritionCharts'
+import { MealPhotoLog } from './MealPhotoLog'
+import { NutritionInsightsSection } from './NutritionInsightsSection'
 import { MealPlanDetail } from './MealPlanDetail'
+import { RecipeCommunityPanel } from './RecipeCommunityPanel'
 import { RecipeSearchModal } from './RecipeSearchModal'
 import { ShoppingListPanel } from './ShoppingListPanel'
 import {
@@ -16,10 +18,8 @@ import type {
   TrendPoint,
   WeeklyAnalytics,
 } from './types'
-import { readApiJson } from '../lib/apiJson'
+import { apiGet, apiPatch, apiPost } from '../lib/apiClient'
 import './nutrition.css'
-
-const apiBase = import.meta.env.VITE_API_BASE ?? '/api'
 
 type NutritionPanelProps = {
   accessToken: string
@@ -28,9 +28,6 @@ type NutritionPanelProps = {
   setMessage: (v: string) => void
   setError: (v: string) => void
   onOpenWellnessInsights?: () => void
-  /** When set (e.g. from wingman), open the shopping list modal for this list. */
-  openShoppingListId?: string | null
-  onShoppingListOpened?: () => void
 }
 
 type CombinedProfile = {
@@ -61,8 +58,6 @@ export function NutritionPanel({
   setMessage,
   setError,
   onOpenWellnessInsights,
-  openShoppingListId,
-  onShoppingListOpened,
 }: NutritionPanelProps) {
   const [profile, setProfile] = useState<CombinedProfile | null>(null)
   const [cuisines, setCuisines] = useState('')
@@ -94,108 +89,136 @@ export function NutritionPanel({
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false)
   const [insights, setInsights] = useState<NutritionInsights | null>(null)
 
-  const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }),
-    [accessToken],
-  )
-
   const loadProfile = useCallback(async () => {
-    const res = await fetch(`${apiBase}/nutrition/profile`, { headers })
-    const body = (await res.json()) as CombinedProfile
-    if (!res.ok) {
+    try {
+      const body = await apiGet<CombinedProfile>('/nutrition/profile', accessToken)
+      setProfile(body)
+      const np = body.nutritionProfile
+      if (Array.isArray(np?.cuisinePreferences)) setCuisines(np.cuisinePreferences.join(', '))
+      if (Array.isArray(np?.dislikedIngredients)) setDisliked(np.dislikedIngredients.join(', '))
+      if (np?.calorieTarget) setCalorieTarget(String(np.calorieTarget))
+      else if (body.suggestedTargets?.calories) setCalorieTarget(String(body.suggestedTargets.calories))
+      if (np?.mealsPerDay) setMealsPerDay(String(np.mealsPerDay))
+      if (np?.snacksPerDay != null) setSnacksPerDay(String(np.snacksPerDay))
+      const macros = np?.macroTargets
+      if (macros?.protein != null) setMacroProtein(String(macros.protein))
+      if (macros?.carbs != null) setMacroCarbs(String(macros.carbs))
+      if (macros?.fats != null) setMacroFats(String(macros.fats))
+      else if (body.suggestedTargets?.macros) {
+        const s = body.suggestedTargets.macros
+        if (s.protein != null) setMacroProtein(String(s.protein))
+        if (s.carbs != null) setMacroCarbs(String(s.carbs))
+        if (s.fats != null) setMacroFats(String(s.fats))
+      }
+      setMealTimes(parsePreferredMealTimes(np?.preferredMealTimes))
+    } catch {
       setError('Failed to load nutrition profile')
-      return
     }
-    setProfile(body)
-    const np = body.nutritionProfile
-    if (Array.isArray(np?.cuisinePreferences)) setCuisines(np.cuisinePreferences.join(', '))
-    if (Array.isArray(np?.dislikedIngredients)) setDisliked(np.dislikedIngredients.join(', '))
-    if (np?.calorieTarget) setCalorieTarget(String(np.calorieTarget))
-    else if (body.suggestedTargets?.calories) setCalorieTarget(String(body.suggestedTargets.calories))
-    if (np?.mealsPerDay) setMealsPerDay(String(np.mealsPerDay))
-    if (np?.snacksPerDay != null) setSnacksPerDay(String(np.snacksPerDay))
-    const macros = np?.macroTargets
-    if (macros?.protein != null) setMacroProtein(String(macros.protein))
-    if (macros?.carbs != null) setMacroCarbs(String(macros.carbs))
-    if (macros?.fats != null) setMacroFats(String(macros.fats))
-    else if (body.suggestedTargets?.macros) {
-      const s = body.suggestedTargets.macros
-      if (s.protein != null) setMacroProtein(String(s.protein))
-      if (s.carbs != null) setMacroCarbs(String(s.carbs))
-      if (s.fats != null) setMacroFats(String(s.fats))
-    }
-    setMealTimes(parsePreferredMealTimes(np?.preferredMealTimes))
-  }, [headers, setError])
+  }, [accessToken, setError])
 
   function nutritionPayload() {
-    const macroTargets =
-      macroProtein || macroCarbs || macroFats
-        ? {
-            protein: Number(macroProtein || 0),
-            carbs: Number(macroCarbs || 0),
-            fats: Number(macroFats || 0),
-          }
-        : undefined
-    return {
+    const meals = Math.round(Number(mealsPerDay))
+    const snacks = Math.round(Number(snacksPerDay))
+    const calRaw = calorieTarget.trim()
+    const cal = calRaw ? Math.round(Number(calRaw)) : NaN
+
+    const pRaw = macroProtein.trim()
+    const cRaw = macroCarbs.trim()
+    const fRaw = macroFats.trim()
+    const p = pRaw ? Math.round(Number(pRaw)) : undefined
+    const c = cRaw ? Math.round(Number(cRaw)) : undefined
+    const f = fRaw ? Math.round(Number(fRaw)) : undefined
+
+    const payload: Record<string, unknown> = {
       cuisinePreferences: cuisines.split(',').map((s) => s.trim()).filter(Boolean),
       dislikedIngredients: disliked.split(',').map((s) => s.trim()).filter(Boolean),
-      calorieTarget: calorieTarget ? Number(calorieTarget) : undefined,
-      calorieTargetSource: 'manual',
-      macroTargets,
-      mealsPerDay: Number(mealsPerDay),
-      snacksPerDay: Number(snacksPerDay),
+      mealsPerDay: Number.isFinite(meals) ? Math.min(6, Math.max(1, meals)) : 3,
+      snacksPerDay: Number.isFinite(snacks) ? Math.min(4, Math.max(0, snacks)) : 0,
       preferredMealTimes: buildPreferredMealTimesPayload(mealTimes),
     }
+
+    if (Number.isFinite(cal) && cal >= 800 && cal <= 6000) {
+      payload.calorieTarget = cal
+      payload.calorieTargetSource = 'manual'
+    }
+
+    if (p != null || c != null || f != null) {
+      payload.macroTargets = {
+        protein: p ?? 0,
+        carbs: c ?? 0,
+        fats: f ?? 0,
+      }
+    }
+
+    return payload
   }
 
   const loadMealPlans = useCallback(async () => {
-    const res = await fetch(`${apiBase}/meal-plans`, { headers })
-    const body = await res.json()
-    if (res.ok && Array.isArray(body)) {
-      const list = body as MealPlanListItem[]
-      setMealPlans(list)
-      setSelectedPlanId((prev) => prev ?? list[0]?.id ?? null)
+    try {
+      const body = await apiGet<MealPlanListItem[]>('/meal-plans', accessToken)
+      if (Array.isArray(body)) {
+        setMealPlans(body)
+        setSelectedPlanId((prev) => prev ?? body[0]?.id ?? null)
+      }
+    } catch {
+      /* keep previous list */
     }
-  }, [headers])
+  }, [accessToken])
 
   const loadDailyAnalytics = useCallback(async () => {
-    const res = await fetch(`${apiBase}/nutrition-analytics/daily?date=${dailyDate}`, {
-      headers,
-    })
-    if (res.ok) setDailyAnalytics((await res.json()) as DailyAnalytics)
-  }, [headers, dailyDate])
+    try {
+      setDailyAnalytics(
+        await apiGet<DailyAnalytics>(`/nutrition-analytics/daily?date=${dailyDate}`, accessToken),
+      )
+    } catch {
+      /* optional refresh */
+    }
+  }, [accessToken, dailyDate])
 
   const loadWeeklyAnalytics = useCallback(async () => {
-    const res = await fetch(`${apiBase}/nutrition-analytics/weekly?end=${dailyDate}`, {
-      headers,
-    })
-    if (res.ok) setWeeklyAnalytics((await res.json()) as WeeklyAnalytics)
-  }, [headers, dailyDate])
+    try {
+      setWeeklyAnalytics(
+        await apiGet<WeeklyAnalytics>(
+          `/nutrition-analytics/weekly?end=${dailyDate}`,
+          accessToken,
+        ),
+      )
+    } catch {
+      /* optional refresh */
+    }
+  }, [accessToken, dailyDate])
 
   const loadTrend = useCallback(async () => {
-    const res = await fetch(`${apiBase}/nutrition-analytics/trend?days=${trendDays}`, { headers })
-    if (res.ok) setTrend((await res.json()) as TrendPoint[])
-  }, [headers, trendDays])
+    try {
+      setTrend(
+        await apiGet<TrendPoint[]>(`/nutrition-analytics/trend?days=${trendDays}`, accessToken),
+      )
+    } catch {
+      /* optional refresh */
+    }
+  }, [accessToken, trendDays])
 
   const loadInsights = useCallback(async () => {
-    const res = await fetch(`${apiBase}/nutrition-analytics/insights`, { headers })
-    if (res.ok) setInsights((await res.json()) as NutritionInsights)
-  }, [headers])
+    try {
+      setInsights(await apiGet<NutritionInsights>('/nutrition-analytics/insights', accessToken))
+    } catch {
+      /* optional refresh */
+    }
+  }, [accessToken])
 
   const loadShoppingLists = useCallback(async () => {
-    const res = await fetch(`${apiBase}/shopping-lists`, { headers })
-    if (!res.ok) return
-    const body = (await res.json()) as ShoppingList[]
-    const list = Array.isArray(body) ? body : []
-    setShoppingLists(list)
-    setSelectedListId((prev) => {
-      if (prev && list.some((l) => l.id === prev)) return prev
-      return list[0]?.id ?? null
-    })
-  }, [headers])
+    try {
+      const body = await apiGet<ShoppingList[]>('/shopping-lists', accessToken)
+      const list = Array.isArray(body) ? body : []
+      setShoppingLists(list)
+      setSelectedListId((prev) => {
+        if (prev && list.some((l) => l.id === prev)) return prev
+        return list[0]?.id ?? null
+      })
+    } catch {
+      /* keep previous lists */
+    }
+  }, [accessToken])
 
   useEffect(() => {
     void loadProfile()
@@ -203,13 +226,6 @@ export function NutritionPanel({
     void loadInsights()
     void loadShoppingLists()
   }, [loadProfile, loadMealPlans, loadInsights, loadShoppingLists])
-
-  useEffect(() => {
-    if (!openShoppingListId) return
-    setSelectedListId(openShoppingListId)
-    setShoppingModalOpen(true)
-    void loadShoppingLists().finally(() => onShoppingListOpened?.())
-  }, [openShoppingListId, loadShoppingLists, onShoppingListOpened])
 
   useEffect(() => {
     void loadDailyAnalytics()
@@ -224,16 +240,19 @@ export function NutritionPanel({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/nutrition/profile`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(nutritionPayload()),
-      })
-      if (!res.ok) throw new Error('Save failed')
+      const calRaw = calorieTarget.trim()
+      if (calRaw) {
+        const cal = Math.round(Number(calRaw))
+        if (!Number.isFinite(cal) || cal < 800 || cal > 6000) {
+          setError('Daily calorie target must be between 800 and 6000 kcal.')
+          return
+        }
+      }
+      await apiPatch('/nutrition/profile', accessToken, nutritionPayload())
       setMessage('Nutrition preferences saved')
       await loadProfile()
-    } catch {
-      setError('Could not save nutrition preferences')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save nutrition preferences')
     } finally {
       setBusy(false)
     }
@@ -243,12 +262,10 @@ export function NutritionPanel({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/nutrition/profile/apply-suggested-targets`, {
-        method: 'POST',
-        headers,
-      })
-      if (!res.ok) throw new Error('Apply failed')
-      const body = await res.json()
+      const body = await apiPost<{
+        calorieTarget?: number
+        macroTargets?: { protein?: number; carbs?: number; fats?: number }
+      }>('/nutrition/profile/apply-suggested-targets', accessToken)
       if (body.calorieTarget) setCalorieTarget(String(body.calorieTarget))
       if (body.macroTargets) {
         setMacroProtein(String(body.macroTargets.protein ?? ''))
@@ -266,12 +283,14 @@ export function NutritionPanel({
   }
 
   async function persistNutritionPrefs() {
-    const res = await fetch(`${apiBase}/nutrition/profile`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(nutritionPayload()),
-    })
-    if (!res.ok) throw new Error('Save nutrition preferences before generating')
+    const calRaw = calorieTarget.trim()
+    if (calRaw) {
+      const cal = Math.round(Number(calRaw))
+      if (!Number.isFinite(cal) || cal < 800 || cal > 6000) {
+        throw new Error('Set a daily calorie target between 800 and 6000 kcal, or clear the field.')
+      }
+    }
+    await apiPatch('/nutrition/profile', accessToken, nutritionPayload())
   }
 
   async function generateMealPlan(
@@ -284,13 +303,11 @@ export function NutritionPanel({
     const planStart = opts?.startDate ?? startDate
     try {
       await persistNutritionPrefs()
-      const res = await fetch(`${apiBase}/meal-plans/generate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ duration: planDuration, startDate: planStart, version: '1.0' }),
-      })
-      const body = await readApiJson<{ message?: string; mealPlan?: { id: string } }>(res)
-      if (!res.ok) throw new Error(body.message ?? 'Generation failed')
+      const body = await apiPost<{ message?: string; mealPlan?: { id: string } }>(
+        '/meal-plans/generate',
+        accessToken,
+        { duration: planDuration, startDate: planStart, version: '1.0' },
+      )
       setMessage(
         regenerate
           ? `Meal plan regenerated (${planDuration})`
@@ -331,6 +348,7 @@ export function NutritionPanel({
         trendDays={trendDays}
         onTrendDaysChange={setTrendDays}
         busy={busy}
+        accessToken={accessToken}
       />
 
       <MealPhotoLog
@@ -345,7 +363,7 @@ export function NutritionPanel({
       <section className="card cardWide">
         <h2>AI nutrition analysis</h2>
         <p className="hint">
-          Nutrition-specific highlights below. For wellness and lifestyle insights, use the{' '}
+          Preview below. Wellness and nutrition insights are grouped on the{' '}
           {onOpenWellnessInsights ? (
             <button type="button" className="linkButton" onClick={onOpenWellnessInsights}>
               Insights tab
@@ -355,54 +373,7 @@ export function NutritionPanel({
           )}
           .
         </p>
-        {!insights ? (
-          <p className="hint">Generating insights from your latest nutrition data...</p>
-        ) : (
-          <div className="nutritionInsightsGrid">
-            <div>
-              <h3>Highlights</h3>
-              {insights.achievements.length ? (
-                <ul>
-                  {insights.achievements.map((item) => (
-                    <li key={`a-${item}`}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="hint">No highlights yet.</p>
-              )}
-            </div>
-            <div>
-              <h3>Potential concerns</h3>
-              {insights.concerns.length ? (
-                <ul>
-                  {insights.concerns.map((item) => (
-                    <li key={`c-${item}`}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="hint">No major concerns detected.</p>
-              )}
-            </div>
-            <div>
-              <h3>Macro balance</h3>
-              <p>Protein: {insights.macroBalance.protein}</p>
-              <p>Carbs: {insights.macroBalance.carbs}</p>
-              <p>Fats: {insights.macroBalance.fats}</p>
-            </div>
-            <div>
-              <h3>Improvement suggestions</h3>
-              {insights.suggestions.length ? (
-                <ul>
-                  {insights.suggestions.map((item) => (
-                    <li key={`s-${item}`}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="hint">No suggestions right now.</p>
-              )}
-            </div>
-          </div>
-        )}
+        <NutritionInsightsSection insights={insights} loading={!insights} compact />
       </section>
 
       <section className="card cardWide">
@@ -537,6 +508,14 @@ export function NutritionPanel({
           setShoppingModalOpen(true)
           void loadShoppingLists()
         }}
+      />
+
+      <RecipeCommunityPanel
+        accessToken={accessToken}
+        busy={busy}
+        setBusy={setBusy}
+        setMessage={setMessage}
+        setError={setError}
       />
 
       <section className="card cardWide">

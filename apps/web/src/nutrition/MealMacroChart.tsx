@@ -1,14 +1,16 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import type { PlannedMealRow } from './types'
+import type { MacroNutrition } from './types'
 
 const COLORS = ['#2563eb', '#16a34a', '#f59e0b']
 
 type Props = {
-  nutrition: PlannedMealRow['nutrition']
+  nutrition: MacroNutrition
   compact?: boolean
+  /** Larger chart for recipe detail modals */
+  detail?: boolean
 }
 
-export function MealMacroChart({ nutrition, compact }: Props) {
+export function MealMacroChart({ nutrition, compact, detail }: Props) {
   const proteinKcal = nutrition.protein * 4
   const carbsKcal = nutrition.carbs * 4
   const fatsKcal = nutrition.fats * 9
@@ -24,10 +26,14 @@ export function MealMacroChart({ nutrition, compact }: Props) {
     { name: 'F', value: fatsKcal, grams: nutrition.fats },
   ].filter((d) => d.value > 0)
 
-  const height = compact ? 72 : 96
+  const height = detail ? 120 : compact ? 72 : 96
+  const innerR = detail ? 28 : compact ? 18 : 24
+  const outerR = detail ? 48 : compact ? 30 : 40
 
   return (
-    <div className={`mealMacroChart${compact ? ' compact' : ''}`}>
+    <div
+      className={`mealMacroChart${compact ? ' compact' : ''}${detail ? ' detail' : ''}`}
+    >
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
           <Pie
@@ -36,8 +42,8 @@ export function MealMacroChart({ nutrition, compact }: Props) {
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius={compact ? 18 : 24}
-            outerRadius={compact ? 30 : 40}
+            innerRadius={innerR}
+            outerRadius={outerR}
           >
             {data.map((d, i) => (
               <Cell key={d.name} fill={COLORS[i % COLORS.length]} />

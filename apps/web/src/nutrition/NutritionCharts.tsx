@@ -12,6 +12,8 @@ import {
   YAxis,
   ReferenceLine,
 } from 'recharts'
+import { useState } from 'react'
+import { MicronutrientsModal } from './MicronutrientsModal'
 import type { DailyAnalytics, TrendPoint, WeeklyAnalytics } from './types'
 
 const MACRO_COLORS = ['#2563eb', '#16a34a', '#f59e0b']
@@ -25,6 +27,7 @@ type Props = {
   trendDays: number
   onTrendDaysChange: (days: number) => void
   busy?: boolean
+  accessToken?: string
 }
 
 const TREND_RANGES = [7, 30, 90] as const
@@ -46,7 +49,9 @@ export function NutritionCharts({
   trendDays,
   onTrendDaysChange,
   busy,
+  accessToken,
 }: Props) {
+  const [microModalOpen, setMicroModalOpen] = useState(false)
   const targetCal = daily?.target.calories ?? 2000
   const intakeCal = daily?.intake.calories ?? 0
   const pctOfTarget = targetCal > 0 ? Math.min(150, Math.round((intakeCal / targetCal) * 100)) : 0
@@ -76,7 +81,19 @@ export function NutritionCharts({
 
   return (
     <section className="card cardWide nutritionCharts">
-      <h2>Nutrition progress</h2>
+      <div className="chartPanelHead">
+        <h2>Nutrition progress</h2>
+        {accessToken ? (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setMicroModalOpen(true)}
+            disabled={busy}
+          >
+            Micronutrients
+          </button>
+        ) : null}
+      </div>
 
       <div className="nutritionChartsGrid">
         <div className="nutritionChartBlock">
@@ -247,6 +264,16 @@ export function NutritionCharts({
           Positive values = below calorie target (deficit). Negative = surplus.
         </p>
       </div>
+
+      {accessToken ? (
+        <MicronutrientsModal
+          accessToken={accessToken}
+          isOpen={microModalOpen}
+          onClose={() => setMicroModalOpen(false)}
+          endDate={dailyDate}
+          days={7}
+        />
+      ) : null}
     </section>
   )
 }

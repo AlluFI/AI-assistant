@@ -2,6 +2,7 @@ import { parseRecommendations, sortByPriority, contextualTips } from './dashboar
 
 type Props = {
   insights: Array<Record<string, unknown>>
+  nutritionPreview?: string | null
   bmiClass: string | null
   wellnessScore: number | null
   weeklyDays: number | null
@@ -11,6 +12,7 @@ type Props = {
 
 export function InsightsHighlight({
   insights,
+  nutritionPreview,
   bmiClass,
   wellnessScore,
   weeklyDays,
@@ -30,13 +32,20 @@ export function InsightsHighlight({
   return (
     <section className="vizBlock insightsHighlight">
       <div className="vizBlockHead">
-        <h3>Latest AI insights</h3>
+        <h3>Latest wellness insights</h3>
         <button type="button" className="secondary" onClick={onViewAll}>
-          View all
+          All insights
         </button>
       </div>
+      {nutritionPreview ? (
+        <p className="hint nutritionInsightTeaser">
+          <strong>Nutrition:</strong> {nutritionPreview}
+        </p>
+      ) : null}
       {!latest ? (
-        <p className="hint">Generate or load insights to see personalized recommendations here.</p>
+        <p className="hint">
+          Generate or load insights on the Insights tab for wellness and nutrition analysis.
+        </p>
       ) : (
         <>
           <p className="insightSummary insightLead">{String(latest.summary ?? '')}</p>

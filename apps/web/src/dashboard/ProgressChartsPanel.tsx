@@ -1,6 +1,6 @@
 import { devToolsEnabled } from '../devTools'
 import { NutritionTrendCompact } from '../nutrition/NutritionTrendCompact'
-import type { TrendPoint } from '../nutrition/types'
+import type { TrendPoint, WeeklyAnalytics } from '../nutrition/types'
 import { UnifiedProgressChart } from './UnifiedProgressChart'
 import { mergeMetricSeries } from './dashboardUtils'
 
@@ -37,6 +37,8 @@ type Props = {
     monthly: { weightDeltaKg: number | null; wellnessDelta: number | null; entries: number }
   } | null
   nutritionTrend?: TrendPoint[]
+  nutritionWeekly?: WeeklyAnalytics | null
+  onViewNutrition?: () => void
 }
 
 const CHART_RANGES = [30, 90, 180, 365] as const
@@ -58,6 +60,8 @@ export function ProgressChartsPanel({
   fitnessGoalPrimary,
   progressSummary,
   nutritionTrend = [],
+  nutritionWeekly = null,
+  onViewNutrition,
 }: Props) {
   const combined = mergeMetricSeries(weightSeries, wellnessSeries, activitySeries)
   const baselinePoint = combined.find((p) => p.isBaseline) ?? combined[0] ?? null
@@ -140,7 +144,13 @@ export function ProgressChartsPanel({
         />
       ) : null}
 
-      <NutritionTrendCompact trend={nutritionTrend} busy={busy} />
+      <NutritionTrendCompact
+        trend={nutritionTrend}
+        weekly={nutritionWeekly}
+        busy={busy}
+        chartDays={chartDays}
+        onViewNutrition={onViewNutrition}
+      />
     </section>
   )
 }
