@@ -46,13 +46,19 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
     function: {
       name: 'get_meal_plan',
       description:
-        'Lists planned meals for a calendar date from the active meal plan.',
+        'Lists planned meals from the active meal plan. Use scope "day" for one date (default) or scope "week" for all 7 days of a weekly plan.',
       parameters: {
         type: 'object',
         properties: {
+          scope: {
+            type: 'string',
+            enum: ['day', 'week'],
+            description:
+              'day = single date (default); week = full weekly plan with all days',
+          },
           date: {
             type: 'string',
-            description: 'YYYY-MM-DD; defaults to today',
+            description: 'YYYY-MM-DD for scope day; defaults to today',
           },
         },
       },
@@ -63,7 +69,7 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
     function: {
       name: 'get_recipe',
       description:
-        'Full recipe details: ingredients, preparation steps, nutrition per serving.',
+        'Full recipe details: ingredients, preparation steps, nutrition per serving. Use recipe_id from get_meal_plan, or pass date + meal_type to load from the active meal plan.',
       parameters: {
         type: 'object',
         properties: {
@@ -71,8 +77,16 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
             type: 'string',
             description: 'Recipe id from meal plan or search',
           },
+          date: {
+            type: 'string',
+            description: 'YYYY-MM-DD — with meal_type to resolve from meal plan',
+          },
+          meal_type: {
+            type: 'string',
+            enum: ['breakfast', 'lunch', 'dinner', 'snack'],
+            description: 'Which planned meal slot to load',
+          },
         },
-        required: ['recipe_id'],
       },
     },
   },

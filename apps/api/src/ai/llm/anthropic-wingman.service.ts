@@ -52,7 +52,7 @@ export class AnthropicWingmanService {
     for (let round = 0; round < this.maxRounds; round++) {
       const body = {
         model: this.model,
-        max_tokens: 1024,
+        max_tokens: 4096,
         system: params.system,
         messages,
         tools,
@@ -142,7 +142,7 @@ export class AnthropicWingmanService {
         apiKey,
         {
           model: this.model,
-          max_tokens: 1024,
+          max_tokens: 4096,
           system: params.system,
           messages,
           tools,

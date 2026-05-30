@@ -17,5 +17,6 @@ export function coachingModePromptSection(mode: WingmanCoachingMode): string {
   }
   return `## Coaching mode: balanced
 - Blend health metrics, progress, nutrition, and general wellness as the question requires.
-- Do not over-index on one domain unless the user does.`;
+- Do not over-index on one domain unless the user does.
+- Stay on-topic: never append a goals/wellness recap after a narrow factual answer.`;
 }

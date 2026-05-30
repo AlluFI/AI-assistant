@@ -13,6 +13,7 @@ const DEMO_INTAKE_PLAN_ID = 'demo_intake_analytics_001';
 const DEMO_INTAKE_VERSION_ID = 'demo_intake_version_001';
 const DEMO_NUTRITION_PROFILE_ID = 'demo_nutrition_001';
 const LEGACY_DEMO_MEAL_PLAN_ID = 'demo_meal_plan_001';
+const DEMO_VISIBLE_VERSION_ID = 'demo_meal_plan_version_001';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -200,6 +201,104 @@ async function seedNutritionProfile(userId: string) {
 }
 
 /** Logged intake rows for analytics only — not shown under Meal plans in the UI. */
+function planDayDate(startDate: string, dayIndex: number): string {
+  const d = new Date(`${startDate}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + dayIndex);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Visible weekly plan with linked recipes — used by Wingman and Nutrition UI. */
+async function seedDemoVisibleMealPlan(userId: string) {
+  const recipeCount = await prisma.recipe.count();
+  if (recipeCount < 9) {
+    console.warn('Skipping demo meal plan: run pnpm nutrition:seed first.');
+    return;
+  }
+
+  const pickByMeal = async (meal: string, take: number) =>
+    prisma.recipe.findMany({
+      where: { meal },
+      orderBy: { id: 'asc' },
+      take,
+      select: { id: true, title: true, timeMinutes: true },
+    });
+
+  const breakfasts = await pickByMeal('breakfast', 7);
+  const lunches = await pickByMeal('lunch', 7);
+  const dinners = await pickByMeal('dinner', 7);
+  if (!breakfasts.length || !lunches.length || !dinners.length) {
+    console.warn('Skipping demo meal plan: missing breakfast/lunch/dinner recipes.');
+    return;
+  }
+
+  const startDate = isoDateDaysAgo(0);
+
+  await prisma.mealPlan.create({
+    data: {
+      id: LEGACY_DEMO_MEAL_PLAN_ID,
+      userId,
+      duration: 'weekly',
+      startDate,
+    },
+  });
+
+  await prisma.mealPlanVersion.create({
+    data: {
+      id: DEMO_VISIBLE_VERSION_ID,
+      mealPlanId: LEGACY_DEMO_MEAL_PLAN_ID,
+      versionLabel: 'Demo week',
+      versionNumber: 1,
+      isActive: true,
+      preferencesSnapshot: { source: 'demo-meal-plan-seed' },
+    },
+  });
+
+  const slotDefs: Array<{
+    type: 'breakfast' | 'lunch' | 'dinner';
+    hour: number;
+    recipes: Array<{ id: string; title: string }>;
+    nutrition: MealMacros;
+  }> = [
+    { type: 'breakfast', hour: 8, recipes: breakfasts, nutrition: MEAL_SLOTS[0]!.nutrition },
+    { type: 'lunch', hour: 13, recipes: lunches, nutrition: MEAL_SLOTS[1]!.nutrition },
+    { type: 'dinner', hour: 19, recipes: dinners, nutrition: MEAL_SLOTS[2]!.nutrition },
+  ];
+
+  const meals: Prisma.PlannedMealCreateManyInput[] = [];
+  let seq = 0;
+
+  for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+    const dayDate = planDayDate(startDate, dayIndex);
+    for (const slot of slotDefs) {
+      const recipe = slot.recipes[dayIndex % slot.recipes.length]!;
+      seq += 1;
+      meals.push({
+        id: `demo_plan_meal_${String(seq).padStart(3, '0')}`,
+        versionId: DEMO_VISIBLE_VERSION_ID,
+        dayIndex,
+        mealType: slot.type,
+        scheduledAt: new Date(`${dayDate}T${String(slot.hour).padStart(2, '0')}:00:00.000Z`),
+        title: recipe.title,
+        recipeId: recipe.id,
+        nutrition: scaleNutrition(slot.nutrition, dayIndex),
+        isManual: false,
+        sortOrder: slot.type === 'breakfast' ? 0 : slot.type === 'lunch' ? 1 : 2,
+      });
+    }
+  }
+
+  await prisma.plannedMeal.createMany({ data: meals, skipDuplicates: true });
+
+  await prisma.mealPlan.update({
+    where: { id: LEGACY_DEMO_MEAL_PLAN_ID },
+    data: { updatedAt: new Date() },
+  });
+
+  console.log(
+    `Demo meal plan: weekly plan ${LEGACY_DEMO_MEAL_PLAN_ID} with ${meals.length} recipe-linked meals.`,
+  );
+}
+
 async function seedNutritionIntakeHistory(userId: string) {
   await prisma.mealPlan.create({
     data: {
@@ -424,6 +523,7 @@ async function main() {
   await cleanupDemoExtras(user.id);
   await seedNutritionProfile(user.id);
   await seedNutritionIntakeHistory(user.id);
+  await seedDemoVisibleMealPlan(user.id);
   await seedActivityLogs(user.id);
   await seedCommunityRecipeFeedback(user.id);
   console.log('Demo extras seed complete.');

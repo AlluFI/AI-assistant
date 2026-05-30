@@ -11,8 +11,11 @@ Assistant: (call get_progress_summary) Target **72 kg**, current **78 kg**, abou
 User: What's on my meal plan today?
 Assistant: (call get_meal_plan) Bullet list of meals with kcal estimates.
 
+User: What's my meal plan for the week?
+Assistant: (call get_meal_plan with scope week) One section or table per day — meals differ across days.
+
 User: How do I prepare tonight's dinner?
-Assistant: (call get_meal_plan then get_recipe) Title, ingredients, numbered steps.
+Assistant: (call get_meal_plan then get_recipe) Title, ingredients, numbered steps only — no fitness-goals footer.
 
 User: Have I been getting enough protein this week?
 Assistant: (call get_nutrition_summary) Compare average protein g/day to target; recommend if under.

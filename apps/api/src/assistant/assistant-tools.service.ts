@@ -4,6 +4,8 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { ProfileService } from '../profile/profile.service';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { RecipesService } from '../recipes/recipes.service';
+import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
+import { weekdayForDate } from './weekly-meal-plan-format.util';
 
 /** Executes wingman tool calls against existing Nest services (JWT-scoped userId). */
 @Injectable()
@@ -176,13 +178,45 @@ export class AssistantToolsService {
     };
   }
 
+  private mapPlannedMeal(m: {
+    id: string;
+    mealType: string;
+    title: string;
+    scheduledAt: Date;
+    recipeId: string | null;
+    recipe: { id: string; title: string; timeMinutes: number } | null;
+    nutrition: unknown;
+  }) {
+    const nutrition = m.nutrition as {
+      calories?: number;
+      protein?: number;
+      carbs?: number;
+      fats?: number;
+    } | null;
+    return {
+      id: m.id,
+      mealType: m.mealType,
+      title: m.title,
+      scheduledAt: m.scheduledAt,
+      recipeId: m.recipeId,
+      recipeTitle: m.recipe?.title ?? null,
+      recipeLinked: Boolean(m.recipeId),
+      calories: nutrition?.calories ?? null,
+      protein: nutrition?.protein ?? null,
+      carbs: nutrition?.carbs ?? null,
+      fats: nutrition?.fats ?? null,
+    };
+  }
+
   private async getMealPlan(userId: string, args: Record<string, unknown>) {
+    const scope =
+      this.enumArg(args.scope, ['day', 'week'], 'scope', false) ?? 'day';
     const date =
       typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
         ? args.date
         : new Date().toISOString().slice(0, 10);
 
-    const plan = await this.prisma.mealPlan.findFirst({
+    const plans = await this.prisma.mealPlan.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -203,8 +237,13 @@ export class AssistantToolsService {
       },
     });
 
+    const plan = plans.find(
+      (row) => !isHiddenDemoMealPlanId(row.id) && row.versions[0],
+    );
+
     if (!plan?.versions[0]) {
       return {
+        scope,
         date,
         error: 'no_active_meal_plan',
         message: 'No active meal plan. Generate one in the Nutrition tab.',
@@ -212,31 +251,51 @@ export class AssistantToolsService {
     }
 
     const version = plan.versions[0];
+    const allMeals = version.meals;
+
+    if (scope === 'week' && plan.duration === 'weekly') {
+      const planDayCount = 7;
+      const days = [];
+      for (let dayIndex = 0; dayIndex < planDayCount; dayIndex += 1) {
+        const date = this.dateForPlanDay(plan.startDate, dayIndex);
+        const dayMeals = allMeals
+          .filter((m) => m.dayIndex === dayIndex)
+          .map((m) => this.mapPlannedMeal(m));
+        days.push({
+          dayIndex,
+          date,
+          weekday: weekdayForDate(date),
+          meals: dayMeals,
+          totalPlannedCalories: dayMeals.reduce(
+            (s, m) => s + (m.calories ?? 0),
+            0,
+          ),
+        });
+      }
+      const missingDayIndexes = days
+        .filter((d) => d.meals.length === 0)
+        .map((d) => d.dayIndex);
+      return {
+        scope: 'week',
+        planId: plan.id,
+        versionId: version.id,
+        duration: plan.duration,
+        startDate: plan.startDate,
+        endDate: this.dateForPlanDay(plan.startDate, planDayCount - 1),
+        dayCount: planDayCount,
+        days,
+        missingDayIndexes,
+        note: 'List every day in days (dayCount=7). Meals differ by day — never omit the last day.',
+      };
+    }
+
     const dayIndex = this.dayIndexForDate(plan.startDate, date, plan.duration);
-    const meals = version.meals
+    const meals = allMeals
       .filter((m) => m.dayIndex === dayIndex)
-      .map((m) => {
-        const nutrition = m.nutrition as {
-          calories?: number;
-          protein?: number;
-          carbs?: number;
-          fats?: number;
-        } | null;
-        return {
-          id: m.id,
-          mealType: m.mealType,
-          title: m.title,
-          scheduledAt: m.scheduledAt,
-          recipeId: m.recipeId,
-          recipeTitle: m.recipe?.title ?? null,
-          calories: nutrition?.calories ?? null,
-          protein: nutrition?.protein ?? null,
-          carbs: nutrition?.carbs ?? null,
-          fats: nutrition?.fats ?? null,
-        };
-      });
+      .map((m) => this.mapPlannedMeal(m));
 
     return {
+      scope: 'day',
       date,
       planId: plan.id,
       versionId: version.id,
@@ -245,13 +304,43 @@ export class AssistantToolsService {
       dayIndex,
       meals,
       totalPlannedCalories: meals.reduce((s, m) => s + (m.calories ?? 0), 0),
+      weekHint:
+        plan.duration === 'weekly'
+          ? 'For all 7 days, call again with scope "week".'
+          : undefined,
     };
   }
 
-  private async getRecipe(_userId: string, args: Record<string, unknown>) {
-    const recipeId = args.recipe_id;
-    if (typeof recipeId !== 'string' || !recipeId.trim()) {
-      throw new BadRequestException('recipe_id is required');
+  private async getRecipe(userId: string, args: Record<string, unknown>) {
+    let recipeId =
+      typeof args.recipe_id === 'string' ? args.recipe_id.trim() : '';
+
+    if (!recipeId) {
+      const date =
+        typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
+          ? args.date
+          : undefined;
+      const mealType = this.enumArg(
+        args.meal_type,
+        ['breakfast', 'lunch', 'dinner', 'snack'],
+        'meal_type',
+        false,
+      );
+      if (date && mealType) {
+        const resolved = await this.resolveRecipeFromMealPlan(
+          userId,
+          date,
+          mealType,
+        );
+        if ('error' in resolved) return resolved;
+        recipeId = resolved.recipeId;
+      }
+    }
+
+    if (!recipeId) {
+      throw new BadRequestException(
+        'recipe_id is required, or provide date and meal_type from the meal plan',
+      );
     }
     const recipe = await this.recipes.getById(recipeId.trim());
     return {
@@ -265,6 +354,61 @@ export class AssistantToolsService {
       ingredients: recipe.ingredients,
       nutritionPerServing: recipe.nutrition,
     };
+  }
+
+  private async resolveRecipeFromMealPlan(
+    userId: string,
+    date: string,
+    mealType: string,
+  ): Promise<
+    | { recipeId: string; title: string }
+    | {
+        error: string;
+        message: string;
+        date: string;
+        meal_type: string;
+        title?: string;
+      }
+  > {
+    const plan = await this.getMealPlan(userId, { date });
+    if ('error' in plan && plan.error) {
+      return {
+        error: String(plan.error),
+        message: String(plan.message ?? 'No meal plan available.'),
+        date,
+        meal_type: mealType,
+      };
+    }
+
+    const meals = (
+      plan as {
+        meals: Array<{
+          mealType: string;
+          recipeId: string | null;
+          title: string;
+        }>;
+      }
+    ).meals;
+    const slot = meals.find((m) => m.mealType === mealType);
+    if (!slot) {
+      return {
+        error: 'no_meal_slot',
+        message: `No ${mealType} slot on your meal plan for ${date}.`,
+        date,
+        meal_type: mealType,
+      };
+    }
+    if (!slot.recipeId) {
+      return {
+        error: 'no_recipe_linked',
+        message:
+          'This meal has no recipe linked yet. Open the Nutrition tab, confirm recipes on your meal plan, or regenerate the meal.',
+        date,
+        meal_type: mealType,
+        title: slot.title,
+      };
+    }
+    return { recipeId: slot.recipeId, title: slot.title };
   }
 
   private async getNutritionSummary(
@@ -365,6 +509,12 @@ export class AssistantToolsService {
       intake: daily.intake,
       target: daily.target.macros,
     };
+  }
+
+  private dateForPlanDay(startDate: string, dayIndex: number): string {
+    const d = new Date(`${startDate}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + dayIndex);
+    return d.toISOString().slice(0, 10);
   }
 
   private dayIndexForDate(

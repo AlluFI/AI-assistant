@@ -9,6 +9,16 @@ import {
   chartUiBlocksFromToolTraces,
   inferChartToolCall,
 } from './chart-ui-blocks.util';
+import { inferMealRecipeToolCall } from './meal-recipe-infer.util';
+import {
+  inferMealPlanWeekScope,
+  normalizeMealPlanToolArgs,
+} from './meal-plan-infer.util';
+import {
+  mergeWeeklyMealPlanReply,
+  weekMealPlanFromTraces,
+  weekdayForDate,
+} from './weekly-meal-plan-format.util';
 import { buildWingmanSystemPrompt } from './prompts/system-prompt';
 import {
   parseLogActivityIntent,
@@ -73,10 +83,14 @@ export class AssistantWingmanService {
     }> = [];
 
     const executeTool = async (name: string, args: Record<string, unknown>) => {
-      const result = await this.tools.execute(userId, name, args);
+      const normalizedArgs =
+        name === 'get_meal_plan'
+          ? normalizeMealPlanToolArgs(userMessage, args)
+          : args;
+      const result = await this.tools.execute(userId, name, normalizedArgs);
       traceResults.push({
         name,
-        args,
+        args: normalizedArgs,
         result,
         resultSummary: JSON.stringify(result).slice(0, 500),
       });
@@ -91,6 +105,8 @@ export class AssistantWingmanService {
     });
 
     await this.applyInferredChartTool(userMessage, traceResults, executeTool);
+    await this.applyInferredMealPlanWeekScope(userMessage, userId, traceResults);
+    await this.applyInferredRecipeTool(userMessage, traceResults, executeTool);
 
     return this.packageLlmReply(userMessage, result.content, traceResults);
   }
@@ -128,10 +144,14 @@ export class AssistantWingmanService {
     }> = [];
 
     const executeTool = async (name: string, args: Record<string, unknown>) => {
-      const result = await this.tools.execute(userId, name, args);
+      const normalizedArgs =
+        name === 'get_meal_plan'
+          ? normalizeMealPlanToolArgs(userMessage, args)
+          : args;
+      const result = await this.tools.execute(userId, name, normalizedArgs);
       traceResults.push({
         name,
-        args,
+        args: normalizedArgs,
         result,
         resultSummary: JSON.stringify(result).slice(0, 500),
       });
@@ -164,6 +184,16 @@ export class AssistantWingmanService {
       traceResults,
       executeTool,
     );
+    yield* this.applyInferredMealPlanWeekScopeStream(
+      userMessage,
+      userId,
+      traceResults,
+    );
+    yield* this.applyInferredRecipeToolStream(
+      userMessage,
+      traceResults,
+      executeTool,
+    );
 
     const packaged = this.packageLlmReply(
       userMessage,
@@ -190,6 +220,11 @@ export class AssistantWingmanService {
   ) {
     const chartBlocks = chartUiBlocksFromToolTraces(traceResults);
     const uiBlocks: AssistantUiBlock[] = [...chartBlocks];
+
+    const weekPlan = weekMealPlanFromTraces(traceResults);
+    if (inferMealPlanWeekScope(userMessage) && weekPlan) {
+      content = mergeWeeklyMealPlanReply(content, weekPlan);
+    }
 
     if (
       /protein|macro|calorie|weight trend|chart|visual/i.test(userMessage) &&
@@ -242,7 +277,7 @@ export class AssistantWingmanService {
       await this.userMemory.getForUser(userId),
     );
     if (longTerm) {
-      system += `\n\n## Long-term memory (across all chats — do not invent beyond this)\n${longTerm}`;
+      system += `\n\n## Long-term memory (across all chats — use only when relevant to this question; do not recite in every reply)\n${longTerm}`;
     }
 
     const prior = await this.prisma.assistantMessage.findMany({
@@ -451,6 +486,137 @@ export class AssistantWingmanService {
     yield {
       type: 'tool_end',
       name: 'get_chart_data',
+      resultSummary: JSON.stringify(result).slice(0, 500),
+    };
+  }
+
+  /** When the user asks for the weekly plan but the tool returned a single day. */
+  private async applyInferredMealPlanWeekScope(
+    userMessage: string,
+    userId: string,
+    traceResults: Array<{
+      name: string;
+      args: Record<string, unknown>;
+      result: unknown;
+      resultSummary: string;
+    }>,
+  ) {
+    if (!inferMealPlanWeekScope(userMessage)) return;
+
+    const idx = traceResults.findIndex((t) => t.name === 'get_meal_plan');
+    if (idx === -1) {
+      const args = { scope: 'week' };
+      const result = await this.tools.execute(userId, 'get_meal_plan', args);
+      traceResults.push({
+        name: 'get_meal_plan',
+        args,
+        result,
+        resultSummary: JSON.stringify(result).slice(0, 500),
+      });
+      return;
+    }
+
+    const prev = traceResults[idx].result as { scope?: string };
+    if (prev?.scope === 'week') return;
+
+    const args = { scope: 'week' };
+    const result = await this.tools.execute(userId, 'get_meal_plan', args);
+    traceResults[idx] = {
+      name: 'get_meal_plan',
+      args,
+      result,
+      resultSummary: JSON.stringify(result).slice(0, 500),
+    };
+  }
+
+  private async *applyInferredMealPlanWeekScopeStream(
+    userMessage: string,
+    userId: string,
+    traceResults: Array<{
+      name: string;
+      args: Record<string, unknown>;
+      result: unknown;
+      resultSummary: string;
+    }>,
+  ): AsyncGenerator<WingmanStreamEvent> {
+    if (!inferMealPlanWeekScope(userMessage)) return;
+
+    const idx = traceResults.findIndex((t) => t.name === 'get_meal_plan');
+    const prev =
+      idx >= 0 ? (traceResults[idx].result as { scope?: string }) : null;
+    if (prev?.scope === 'week') return;
+
+    const args = { scope: 'week' };
+    yield { type: 'tool_start', name: 'get_meal_plan', args };
+    const result = await this.tools.execute(userId, 'get_meal_plan', args);
+    const entry = {
+      name: 'get_meal_plan',
+      args,
+      result,
+      resultSummary: JSON.stringify(result).slice(0, 500),
+    };
+    if (idx >= 0) {
+      traceResults[idx] = entry;
+    } else {
+      traceResults.push(entry);
+    }
+    yield {
+      type: 'tool_end',
+      name: 'get_meal_plan',
+      resultSummary: entry.resultSummary,
+    };
+  }
+
+  /** When the user asks how to prepare a planned meal but skips `get_recipe`. */
+  private async applyInferredRecipeTool(
+    userMessage: string,
+    traceResults: Array<{ name: string }>,
+    executeTool: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>,
+  ) {
+    const inferred = inferMealRecipeToolCall(userMessage);
+    if (!inferred || traceResults.some((t) => t.name === 'get_recipe')) {
+      return;
+    }
+    if (!traceResults.some((t) => t.name === 'get_meal_plan')) {
+      await executeTool('get_meal_plan', { date: inferred.date });
+    }
+    await executeTool('get_recipe', {
+      date: inferred.date,
+      meal_type: inferred.meal_type,
+    });
+  }
+
+  private async *applyInferredRecipeToolStream(
+    userMessage: string,
+    traceResults: Array<{ name: string }>,
+    executeTool: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>,
+  ): AsyncGenerator<WingmanStreamEvent> {
+    const inferred = inferMealRecipeToolCall(userMessage);
+    if (!inferred || traceResults.some((t) => t.name === 'get_recipe')) {
+      return;
+    }
+    if (!traceResults.some((t) => t.name === 'get_meal_plan')) {
+      const planArgs = { date: inferred.date };
+      yield { type: 'tool_start', name: 'get_meal_plan', args: planArgs };
+      const planResult = await executeTool('get_meal_plan', planArgs);
+      yield {
+        type: 'tool_end',
+        name: 'get_meal_plan',
+        resultSummary: JSON.stringify(planResult).slice(0, 500),
+      };
+    }
+    const args = { date: inferred.date, meal_type: inferred.meal_type };
+    yield { type: 'tool_start', name: 'get_recipe', args };
+    const result = await executeTool('get_recipe', args);
+    yield {
+      type: 'tool_end',
+      name: 'get_recipe',
       resultSummary: JSON.stringify(result).slice(0, 500),
     };
   }

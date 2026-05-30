@@ -22,6 +22,12 @@
     "expectTools": ["get_meal_plan"]
   },
   {
+    "id": "meal-week",
+    "message": "What's my meal plan for the week?",
+    "expectTools": ["get_meal_plan"],
+    "argHints": { "scope": "week" }
+  },
+  {
     "id": "nutrition-calories",
     "message": "How many calories have I consumed today?",
     "expectTools": ["get_nutrition_summary"]
@@ -48,6 +54,12 @@
     "id": "recipe-search",
     "message": "Find high protein chicken dinner recipes",
     "expectTools": ["search_recipes"]
+  },
+  {
+    "id": "recipe-prepare-dinner",
+    "message": "How do I prepare tomorrow night's dinner?",
+    "expectTools": ["get_meal_plan", "get_recipe"],
+    "anyOfTools": false
   },
   {
     "id": "wellness-sleep",

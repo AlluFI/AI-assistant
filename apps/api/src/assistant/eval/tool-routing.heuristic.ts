@@ -17,7 +17,9 @@ export function inferExpectedTools(message: string): string[] {
   if (/weight goal|progress|how close/i.test(lower)) {
     tools.push('get_progress_summary');
   }
-  if (/meal plan|what's for|whats for|lunch today|dinner today/i.test(lower)) {
+  if (/meal plan.*week|week'?s meal plan|plan for the week|meals for the week/i.test(lower)) {
+    tools.push('get_meal_plan');
+  } else if (/meal plan|what's for|whats for|lunch today|dinner today/i.test(lower)) {
     tools.push('get_meal_plan');
   }
   if (/calorie|protein target|macro|consumed today/i.test(lower)) {
@@ -26,8 +28,8 @@ export function inferExpectedTools(message: string): string[] {
   if (/search|find.*recipe/i.test(lower)) {
     tools.push('search_recipes');
   }
-  if (/recipe details|how do i prepare|ingredients for/i.test(lower)) {
-    tools.push('get_recipe');
+  if (/recipe details|how do i prepare|how to prepare|prepare tonight|prepare tomorrow|ingredients for/i.test(lower)) {
+    tools.push('get_meal_plan', 'get_recipe');
   }
   const chart = inferChartToolCall(message);
   if (chart) tools.push('get_chart_data');
