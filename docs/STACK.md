@@ -12,15 +12,12 @@ Phase 3 should **not** assume OpenAI is the only option — but **defaulting to 
 
 ## Provider-agnostic interface
 
-```typescript
-interface LlmClient {
-  chat(params: ChatParams): Promise<ChatResult>
-  chatWithTools(params: ToolChatParams): Promise<ToolChatResult>
-  embed(text: string): Promise<number[]>
-}
-```
+Wingman uses **`WingmanLlmFacade`** (`apps/api/src/ai/llm/wingman-llm.facade.ts`) with provider-specific implementations:
 
-Implementations: `OpenAiLlmClient`, later `AnthropicLlmClient`, `MistralLlmClient`, etc.
+- **`AnthropicWingmanService`** — default when `ANTHROPIC_API_KEY` is set
+- **`OpenAiWingmanService`** — fallback or when `ASSISTANT_LLM_PROVIDER=openai`
+
+Parts 1–2 structured AI (meal plans, insights, RAG) stays on **`OpenAiClientService`**.
 
 ## Comparison (for this product)
 
@@ -28,7 +25,7 @@ Implementations: `OpenAiLlmClient`, later `AnthropicLlmClient`, `MistralLlmClien
 |----------|---------------|----------|
 | [OpenAI](https://platform.openai.com) | Tool calling, JSON, already integrated | US API; cost at scale |
 | Anthropic (Claude) | Long coaching conversations, tone | New client + eval |
-| Google (Gemini) | Price/context; future food images | Different API surface |
+| Google (Gemini) | Meal photo vision (food ID + grams) | Different API surface; calories from DB |
 | Mistral | EU-friendly, cost | Tool calling needs thorough testing |
 | Azure OpenAI | Same models, EU data residency | Extra setup |
 | Self-hosted (Llama, etc.) | Data on your infra | Ops + weaker tools unless tuned |

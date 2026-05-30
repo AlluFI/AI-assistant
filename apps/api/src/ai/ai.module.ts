@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { NutritionToolsModule } from '../nutrition-tools/nutrition-tools.module';
-import { AnthropicClientService } from './llm/anthropic-client.service';
 import { AnthropicWingmanService } from './llm/anthropic-wingman.service';
 import { AssistantLlmService } from './llm/assistant-llm.service';
 import { OpenAiWingmanService } from './llm/openai-wingman.service';
@@ -11,7 +10,6 @@ import { OpenAiClientService } from './openai-client.service';
   imports: [NutritionToolsModule],
   providers: [
     OpenAiClientService,
-    AnthropicClientService,
     AssistantLlmService,
     OpenAiWingmanService,
     AnthropicWingmanService,

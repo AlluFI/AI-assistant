@@ -6,22 +6,22 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 
 | Path | Purpose |
 |------|---------|
-| `apps/api/` | NestJS API — auth, profile, nutrition, meal plans, `assistant` module |
-| `apps/web/` | React UI — dashboards, nutrition, (future) chat panel |
+| `apps/api/` | NestJS API — auth, profile, nutrition, meal plans, `assistant`, `meal-photos` |
+| `apps/web/` | React UI — dashboards, nutrition, wingman chat (`apps/web/src/wingman/`) |
 | `docs/ARCHITECTURE.md` | Wingman orchestration, memory, tools |
 | `docs/API_SKETCH.md` | Assistant HTTP contract |
 | `docs/STACK.md` | OpenAI / Anthropic / Gemini split |
 | `docs/ROADMAP.md` | Phase 3 delivery phases |
-| `docs/PHASE3_BOOTSTRAP.md` | Current bootstrap status |
+| `docs/PHASE3_BOOTSTRAP.md` | Bootstrap checklist and readiness |
 | `docs/REVIEWER_SETUP.md` | Clone, Docker, demo user |
 
-## Where to implement next
+## Key modules
 
-| Change | Where |
-|--------|--------|
-| Tool loop, Anthropic chat, Prisma assistant data | `apps/api/src/assistant/` |
-| Chat UI, chart `ui_blocks` | `apps/web/` |
-| Architecture / API contract updates | `docs/` first, then code |
+| Feature | API | Web |
+|---------|-----|-----|
+| Wingman chat + tools | `apps/api/src/assistant/` | `apps/web/src/wingman/` |
+| Meal photo vision | `apps/api/src/meal-photos/` | `apps/web/src/nutrition/MealPhotoLog.tsx` |
+| Nutrition + meal plans | `apps/api/src/meal-plans/`, `nutrition/` | `apps/web/src/nutrition/` |
 
 ## Relation to counting-calories
 

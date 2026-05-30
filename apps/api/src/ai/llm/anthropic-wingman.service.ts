@@ -17,7 +17,7 @@ export class AnthropicWingmanService {
 
   get model(): string {
     return (
-      this.config.get<string>('ASSISTANT_MODEL') ?? 'claude-sonnet-4-20250514'
+      this.config.get<string>('ASSISTANT_MODEL') ?? 'claude-sonnet-4-6'
     );
   }
 

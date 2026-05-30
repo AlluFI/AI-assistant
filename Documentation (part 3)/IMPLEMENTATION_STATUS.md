@@ -1,6 +1,6 @@
 # Part 3 — Implementation status vs requirements
 
-**Audit date:** 2026-05-28  
+**Audit date:** 2026-05-30  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
 **Offline check:** `pnpm wingman:eval` → **14/14** routing heuristics pass (does not replace live LLM demo).
@@ -209,6 +209,7 @@ Root `.env` (Compose) or `apps/api/.env` (local dev) — see `.env.example`.
 
 ```env
 ANTHROPIC_API_KEY=          # or OPENAI + ASSISTANT_LLM_PROVIDER=openai
+ASSISTANT_MODEL=claude-sonnet-4-6
 ASSISTANT_ENABLED=true
 ASSISTANT_STREAMING=true
 ASSISTANT_SUMMARY_MODE=llm
