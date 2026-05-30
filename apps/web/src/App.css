@@ -1,5 +1,6 @@
 .page {
   max-width: 64rem;
+  width: 100%;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
   font-family: system-ui, sans-serif;
@@ -26,6 +27,7 @@
   flex-direction: column;
   gap: 1.25rem;
   margin-top: 1.5rem;
+  min-width: 0;
 }
 
 .consentModalBackdrop {
@@ -493,8 +495,13 @@ button.secondary.active,
 
 .dashboardGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
+  min-width: 0;
+}
+
+.dashboardGrid > .card {
+  min-width: 0;
 }
 
 .cardWide {
@@ -512,9 +519,24 @@ button.secondary.active,
   gap: 0.45rem;
 }
 
+@media (max-width: 640px) {
+  .page {
+    padding: 1rem 0.75rem 3rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .dashboardTabs button {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+  }
+}
+
 @media (min-width: 980px) {
   .dashboardGrid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cardSpan2 {

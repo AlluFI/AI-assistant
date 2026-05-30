@@ -147,12 +147,82 @@ export function RecordMetricsPanel({
 
   const canDeleteWeight = (source?: string) => source !== 'profile_baseline'
 
+  const rowIsEditing = (row: HistoryRow) =>
+    (row.kind === 'weight' && row.id === editingWeightId) ||
+    (row.kind === 'activity' && row.id === editingActivityId)
+
+  const renderHistoryActions = (row: HistoryRow) => {
+    if (row.kind === 'weight') {
+      return (
+        <>
+          <button
+            type="button"
+            className="secondary recordActionBtn"
+            disabled={busy}
+            onClick={() =>
+              onEditWeight(
+                metrics.find((m) => m.id === row.id) ?? {
+                  id: row.id,
+                  recordedAt: row.at,
+                  weightKg: row.weightKg,
+                },
+              )
+            }
+          >
+            Edit
+          </button>
+          {canDeleteWeight(row.source) ? (
+            <button
+              type="button"
+              className="secondary recordActionBtn"
+              disabled={busy}
+              onClick={() => onDeleteWeight(row.id)}
+            >
+              Remove
+            </button>
+          ) : null}
+        </>
+      )
+    }
+
+    return (
+      <>
+        <button
+          type="button"
+          className="secondary recordActionBtn"
+          disabled={busy}
+          onClick={() =>
+            onEditActivity(
+              activities.find((a) => a.id === row.id) ?? {
+                id: row.id,
+                activityType: row.activityType,
+                activityAt: row.at,
+                durationMinutes: row.durationMinutes,
+                notes: row.notes,
+              },
+            )
+          }
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className="secondary recordActionBtn"
+          disabled={busy}
+          onClick={() => onDeleteActivity(row.id)}
+        >
+          Remove
+        </button>
+      </>
+    )
+  }
+
   return (
     <div className="dashboardGrid recordMetrics">
       <section className="card cardSpan2">
         <h2>Record metrics</h2>
         <p className="hint">
-          Log weigh-ins and workouts. Use Edit in the history table to correct a
+          Log weigh-ins and workouts. Use Edit in the history list to correct an
           entry, or Remove to delete it.
         </p>
 
@@ -340,110 +410,89 @@ export function RecordMetricsPanel({
         ) : null}
 
         {filteredHistory.length ? (
-          <div className="recordTableWrap">
-            <table className="recordTable">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  {historyView !== 'weight' ? <th>Type</th> : null}
-                  {historyView !== 'activities' ? <th>Weight</th> : null}
-                  {historyView !== 'weight' ? <th>Duration</th> : null}
-                  <th aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHistory.map((row) => (
-                  <tr
-                    key={`${row.kind}-${row.id}`}
-                    className={
-                      (row.kind === 'weight' && row.id === editingWeightId) ||
-                      (row.kind === 'activity' && row.id === editingActivityId)
-                        ? 'recordRowEditing'
-                        : undefined
-                    }
-                  >
-                    <td title={fmtDateFull(row.at)}>{fmtDate(row.at)}</td>
+          <>
+            <ul className="recordHistoryCards" aria-label="History entries">
+              {filteredHistory.map((row) => (
+                <li
+                  key={`card-${row.kind}-${row.id}`}
+                  className={`recordHistoryCard${rowIsEditing(row) ? ' recordRowEditing' : ''}`}
+                >
+                  <p className="recordHistoryCardDate" title={fmtDateFull(row.at)}>
+                    {fmtDate(row.at)}
+                  </p>
+                  <dl className="recordHistoryCardMeta">
                     {historyView !== 'weight' ? (
-                      <td>
-                        {row.kind === 'activity' ? row.activityTypeLabel : '—'}
-                      </td>
+                      <div>
+                        <dt>Type</dt>
+                        <dd>
+                          {row.kind === 'activity' ? row.activityTypeLabel : '—'}
+                        </dd>
+                      </div>
                     ) : null}
                     {historyView !== 'activities' ? (
-                      <td>
-                        {row.kind === 'weight' ? `${row.weightKg} kg` : '—'}
-                      </td>
+                      <div>
+                        <dt>Weight</dt>
+                        <dd>{row.kind === 'weight' ? `${row.weightKg} kg` : '—'}</dd>
+                      </div>
                     ) : null}
                     {historyView !== 'weight' ? (
-                      <td>
-                        {row.kind === 'activity' ? `${row.durationMinutes} min` : '—'}
-                      </td>
+                      <div>
+                        <dt>Duration</dt>
+                        <dd>
+                          {row.kind === 'activity' ? `${row.durationMinutes} min` : '—'}
+                        </dd>
+                      </div>
                     ) : null}
-                    <td className="recordTableActions">
-                      {row.kind === 'weight' ? (
-                        <>
-                          <button
-                            type="button"
-                            className="secondary recordActionBtn"
-                            disabled={busy}
-                            onClick={() =>
-                              onEditWeight(
-                                metrics.find((m) => m.id === row.id) ?? {
-                                  id: row.id,
-                                  recordedAt: row.at,
-                                  weightKg: row.weightKg,
-                                },
-                              )
-                            }
-                          >
-                            Edit
-                          </button>
-                          {canDeleteWeight(row.source) ? (
-                            <button
-                              type="button"
-                              className="secondary recordActionBtn"
-                              disabled={busy}
-                              onClick={() => onDeleteWeight(row.id)}
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="secondary recordActionBtn"
-                            disabled={busy}
-                            onClick={() =>
-                              onEditActivity(
-                                activities.find((a) => a.id === row.id) ?? {
-                                  id: row.id,
-                                  activityType: row.activityType,
-                                  activityAt: row.at,
-                                  durationMinutes: row.durationMinutes,
-                                  notes: row.notes,
-                                },
-                              )
-                            }
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary recordActionBtn"
-                            disabled={busy}
-                            onClick={() => onDeleteActivity(row.id)}
-                          >
-                            Remove
-                          </button>
-                        </>
-                      )}
-                    </td>
+                  </dl>
+                  <div className="recordHistoryCardActions">
+                    {renderHistoryActions(row)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="recordTableWrap recordTableWrapDesktop">
+              <table className="recordTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    {historyView !== 'weight' ? <th>Type</th> : null}
+                    {historyView !== 'activities' ? <th>Weight</th> : null}
+                    {historyView !== 'weight' ? <th>Duration</th> : null}
+                    <th aria-label="Actions" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredHistory.map((row) => (
+                    <tr
+                      key={`${row.kind}-${row.id}`}
+                      className={rowIsEditing(row) ? 'recordRowEditing' : undefined}
+                    >
+                      <td title={fmtDateFull(row.at)}>{fmtDate(row.at)}</td>
+                      {historyView !== 'weight' ? (
+                        <td>
+                          {row.kind === 'activity' ? row.activityTypeLabel : '—'}
+                        </td>
+                      ) : null}
+                      {historyView !== 'activities' ? (
+                        <td>
+                          {row.kind === 'weight' ? `${row.weightKg} kg` : '—'}
+                        </td>
+                      ) : null}
+                      {historyView !== 'weight' ? (
+                        <td>
+                          {row.kind === 'activity' ? `${row.durationMinutes} min` : '—'}
+                        </td>
+                      ) : null}
+                      <td className="recordTableActions">
+                        {renderHistoryActions(row)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : null}
       </section>
     </div>
