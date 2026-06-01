@@ -5,6 +5,7 @@ import { RecipeCommunityFeedback } from './RecipeCommunityFeedback'
 import { GenerationStepsPanel } from './GenerationStepsPanel'
 import { RecipeNutritionViz } from './RecipeNutritionViz'
 import { formatDietaryTags, formatPreparationStep } from './recipeDisplay'
+import { fmtDateTime } from '../dashboard/dashboardUtils'
 import { devToolsEnabled } from '../devTools'
 import { apiGet, apiPost, apiRequest } from '../lib/apiClient'
 import type {
@@ -64,20 +65,6 @@ function parseNutrition(raw: unknown): PlannedMealRow['nutrition'] {
     protein: n?.protein ?? 0,
     carbs: n?.carbs ?? 0,
     fats: n?.fats ?? 0,
-  }
-}
-
-function fmtTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso
   }
 }
 
@@ -736,7 +723,7 @@ export function MealPlanDetail({
                     </span>
                     {!swapMode ? <span className="dragHandle" title="Drag to reorder">⠿</span> : null}
                     <h3>{meal.title}</h3>
-                    <p className="hint">{fmtTime(meal.scheduledAt)}</p>
+                    <p className="hint">{fmtDateTime(meal.scheduledAt)}</p>
                   </div>
                   <MealMacroChart nutrition={meal.nutrition} compact />
                 </div>

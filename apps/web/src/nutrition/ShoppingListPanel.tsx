@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsPDF } from 'jspdf'
+import { fmtDateTime } from '../dashboard/dashboardUtils'
 import { apiDelete, apiPatch } from '../lib/apiClient'
 import type { ShoppingList } from './types'
 
@@ -48,17 +49,6 @@ function formatQty(item: ShoppingList['items'][0]): string {
     return g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g)} g`
   }
   return '—'
-}
-
-function fmtDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
-  } catch {
-    return iso
-  }
 }
 
 export function ShoppingListPanel({
@@ -208,7 +198,7 @@ export function ShoppingListPanel({
     doc.text(title, margin, y)
     y += 7
     doc.setFontSize(10)
-    doc.text(`Created: ${fmtDate(activeList.createdAt)}`, margin, y)
+    doc.text(`Created: ${fmtDateTime(activeList.createdAt)}`, margin, y)
     y += 7
     doc.text(`${visibleCount} of ${totalCount} items to buy`, margin, y)
     y += 9
@@ -325,7 +315,7 @@ export function ShoppingListPanel({
             >
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.title ?? 'Untitled list'} · {fmtDate(l.createdAt)}
+                  {l.title ?? 'Untitled list'} · {fmtDateTime(l.createdAt)}
                 </option>
               ))}
             </select>

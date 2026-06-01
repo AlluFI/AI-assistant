@@ -73,9 +73,6 @@ export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
 }
 
-/** European-style dates (day before month). */
-const EU_DATE_LOCALE = 'en-GB'
-
 function parseDateInput(iso: unknown): Date | null {
   if (iso == null) return null
   const d = new Date(iso as string | number)
@@ -98,32 +95,31 @@ export function dateInputFromIso(iso: string) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-/** Short chart label: DD/MM */
+function fmtIsoDateFromDate(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+function fmtIsoTimeFromDate(d: Date) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+}
+
+/** ISO 8601 calendar date (YYYY-MM-DD) in local timezone. */
 export function fmtDate(iso: unknown) {
   const d = parseDateInput(iso)
   if (!d) return typeof iso === 'string' ? iso : String(iso ?? '')
-  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`
+  return fmtIsoDateFromDate(d)
 }
 
-/** Tooltips and details: DD/MM/YYYY */
+/** Full date label (same as fmtDate — year-month-day). */
 export function fmtDateFull(iso: unknown) {
-  const d = parseDateInput(iso)
-  if (!d) return typeof iso === 'string' ? iso : String(iso ?? '')
-  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`
+  return fmtDate(iso)
 }
 
-/** Timestamps: DD/MM/YYYY, 24-hour clock */
+/** ISO 8601 date-time (YYYY-MM-DDTHH:mm:ss) in local timezone. */
 export function fmtDateTime(iso: unknown) {
   const d = parseDateInput(iso)
   if (!d) return typeof iso === 'string' ? iso : String(iso ?? '')
-  return d.toLocaleString(EU_DATE_LOCALE, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return `${fmtIsoDateFromDate(d)}T${fmtIsoTimeFromDate(d)}`
 }
 
 export function bmiMarkerPercent(bmi: number) {
@@ -240,11 +236,7 @@ export function projectedGoalDate(
   const daysToGo = Math.ceil(Math.abs(remaining / ratePerDay))
   if (daysToGo > 365 * 2) return null
   const projected = new Date(last.t + daysToGo * 86400000)
-  return projected.toLocaleDateString(EU_DATE_LOCALE, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return fmtDate(projected)
 }
 
 export type SignificantChange = { t: string; delta: number; label: string }
