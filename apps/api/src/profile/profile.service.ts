@@ -16,6 +16,7 @@ import { MetricUpdateDto } from './dto/metric-update.dto';
 import { PrivacyUpdateDto } from './dto/privacy-update.dto';
 import { ConsentDto } from './dto/consent.dto';
 import { num } from '../analytics/analytics.service';
+import { hasWellnessInputs } from '../analytics/analytics-wellness.util';
 import { DeleteRequestDto } from './dto/delete-request.dto';
 import { ACTIVITY_TYPES, activityTypeLabel } from './activity-catalog';
 import { parseRecordedAt } from './recorded-at.util';
@@ -179,14 +180,15 @@ export class ProfileService {
       fitnessGoalPrimary: string | null;
     },
   ) {
-    const weightKg = num(profile.weightKg);
-    if (weightKg == null && profile.weeklyActivityDays == null) return;
-
-    const { score, bmi } = this.analytics.wellnessScore(profile, {
-      weightKg,
+    const snapshot = {
+      weightKg: num(profile.weightKg),
       heightCm: num(profile.heightCm),
       weeklyActivityDays: profile.weeklyActivityDays,
-    });
+    };
+    if (!hasWellnessInputs(profile, snapshot)) return;
+
+    const { score, bmi } = this.analytics.wellnessScore(profile, snapshot);
+    if (score == null) return;
 
     const existing = await this.prisma.healthMetricSnapshot.findFirst({
       where: { userId, source: 'profile_baseline' },
@@ -198,7 +200,8 @@ export class ProfileService {
         data: {
           userId,
           recordedAt: new Date(),
-          weightKg: weightKg != null ? profile.weightKg : null,
+          weightKg:
+            snapshot.weightKg != null ? profile.weightKg : null,
           heightCm: profile.heightCm,
           weeklyActivityDays: profile.weeklyActivityDays,
           wellnessScore: score,

@@ -18,7 +18,7 @@ type InsightContext = {
   user_metrics: {
     restrictions?: unknown[];
     target_state?: { primaryGoal?: string | null };
-    analytics?: { wellnessScore?: number; bmiClassification?: string | null };
+    analytics?: { wellnessScore?: number | null; bmiClassification?: string | null };
     current_state?: { weeklyActivityDays?: number | null };
   };
 };
@@ -317,7 +317,7 @@ export class InsightsService {
 
   private fallbackInsight(context: {
     user_metrics: {
-      analytics?: { wellnessScore?: number; bmiClassification?: string | null };
+      analytics?: { wellnessScore?: number | null; bmiClassification?: string | null };
       current_state?: { weeklyActivityDays?: number | null };
       target_state?: { primaryGoal?: string | null };
     };

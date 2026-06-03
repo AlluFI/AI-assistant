@@ -6,15 +6,10 @@ import {
   weekStartUtc,
   weeklyActiveDaysFromLogs,
 } from './activity-week.util';
+import { hasWellnessInputs } from './analytics-wellness.util';
 
-export type HealthProfileLike = {
-  heightCm: Prisma.Decimal | null;
-  weightKg: Prisma.Decimal | null;
-  targetWeightKg: Prisma.Decimal | null;
-  activityLevel: string | null;
-  fitnessGoalPrimary: string | null;
-  weeklyActivityDays: number | null;
-};
+export type { HealthProfileLike } from './analytics-wellness.util';
+import type { HealthProfileLike } from './analytics-wellness.util';
 
 export function num(
   v: Prisma.Decimal | number | null | undefined,
@@ -93,10 +88,14 @@ export class AnalyticsService {
       heightCm: number | null;
       weeklyActivityDays: number | null;
     },
-  ): { score: number; bmi: number | null; bmiClass: string | null } {
+  ): { score: number | null; bmi: number | null; bmiClass: string | null } {
     const w = snapshot.weightKg ?? num(profile.weightKg);
     const h = snapshot.heightCm ?? num(profile.heightCm);
     const bmi = w != null && h != null ? this.computeBmi(w, h) : null;
+    const bmiClass = bmi != null ? this.classifyBmi(bmi) : null;
+    if (!hasWellnessInputs(profile, snapshot)) {
+      return { score: null, bmi, bmiClass };
+    }
     const bmiScore = this.bmiComponentScore(bmi);
     const activityScore = this.activityComponentScore(profile.activityLevel);
     const progressScore = this.progressComponentScore(profile, w);
@@ -112,7 +111,7 @@ export class AnalyticsService {
     return {
       score: Math.max(0, Math.min(100, score)),
       bmi,
-      bmiClass: bmi != null ? this.classifyBmi(bmi) : null,
+      bmiClass,
     };
   }
 
@@ -160,14 +159,15 @@ export class AnalyticsService {
       bmi,
       bmiClassification: bmiClass,
       wellnessScore: score,
-      components: profile
-        ? {
-            bmi: this.bmiComponentScore(bmi),
-            activity: this.activityComponentScore(profile.activityLevel),
-            progress: this.progressComponentScore(profile, w),
-            habits: this.habitsComponentScore(weekly),
-          }
-        : null,
+      components:
+        profile && score != null
+          ? {
+              bmi: this.bmiComponentScore(bmi),
+              activity: this.activityComponentScore(profile.activityLevel),
+              progress: this.progressComponentScore(profile, w),
+              habits: this.habitsComponentScore(weekly),
+            }
+          : null,
       latestMetricAt: latest?.recordedAt ?? null,
     };
   }
@@ -191,15 +191,18 @@ export class AnalyticsService {
       where: { userId },
     });
     if (!profile) return null;
-    const w = num(profile.weightKg);
-    if (w == null && profile.weeklyActivityDays == null) return null;
 
+    const w = num(profile.weightKg);
     const h = num(profile.heightCm);
-    const { score, bmi } = this.wellnessScore(profile, {
+    const snapshot = {
       weightKg: w,
       heightCm: h,
       weeklyActivityDays: profile.weeklyActivityDays,
-    });
+    };
+    if (!hasWellnessInputs(profile, snapshot)) return null;
+
+    const { score, bmi } = this.wellnessScore(profile, snapshot);
+    if (score == null) return null;
 
     return {
       recordedAt: profile.createdAt,
