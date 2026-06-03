@@ -19,14 +19,16 @@ COPY apps/api/nest-cli.json apps/api/nest-cli.json
 COPY apps/api/eslint.config.mjs apps/api/eslint.config.mjs
 COPY apps/api/src apps/api/src
 COPY apps/api/test apps/api/test
+COPY docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 
 RUN pnpm install --frozen-lockfile --filter api...
 
 WORKDIR /repo/apps/api
 RUN pnpm exec prisma generate
 RUN pnpm run build
+RUN chmod +x /usr/local/bin/api-entrypoint.sh
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/src/main.js"]
+ENTRYPOINT ["/usr/local/bin/api-entrypoint.sh"]
