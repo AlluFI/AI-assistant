@@ -477,6 +477,9 @@ export function WingmanChat({
     }
   }, [authFetch, onDataChanged, onOnboardingRefresh])
 
+  const showStarterChips =
+    !onboardingActive && !messages.some((m) => m.role === 'user')
+
   return (
     <>
       <button
@@ -604,22 +607,23 @@ export function WingmanChat({
 
           {error ? <p className="wingmanErr">{error}</p> : null}
 
-          <div className="wingmanStarters">
-            {!onboardingActive &&
-              WINGMAN_STARTER_PROMPTS[
+          {showStarterChips ? (
+            <div className="wingmanStarters">
+              {WINGMAN_STARTER_PROMPTS[
                 coachingMode === 'onboarding' ? 'balanced' : coachingMode
               ].map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className="wingmanStarterChip"
-                disabled={busy}
-                onClick={() => void sendText(prompt)}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
+                <button
+                  key={prompt}
+                  type="button"
+                  className="wingmanStarterChip"
+                  disabled={busy}
+                  onClick={() => void sendText(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="wingmanMessages" ref={listRef}>
             {messages.map((m) => (
