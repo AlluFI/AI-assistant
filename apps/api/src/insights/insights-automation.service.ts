@@ -112,7 +112,7 @@ export class InsightsAutomationService {
         await this.mail.sendWellnessReminderEmail(
           pref.user.email,
           'Weekly reminder: record your weight',
-          `Hi ${pref.user.displayName ?? 'there'},\n\nThis is your weekly reminder to record your weight in Numbers Dont Lie so your trend and insights stay accurate.\n\nOpen the dashboard and use the Record tab.\n`,
+          `Hi ${pref.user.displayName ?? 'there'},\n\nThis is your weekly reminder to record your weight in Numbers Dont Lie so your trend and insights stay accurate.\n\nOpen the dashboard and use the Weight & activity tab.\n`,
         );
         await this.prisma.privacySettings.update({
           where: { userId: pref.userId },
@@ -142,7 +142,7 @@ export class InsightsAutomationService {
           } reminder: log an activity`,
           `Hi ${pref.user.displayName ?? 'there'},\n\nQuick ${
             pref.activityReminderCadence === 'daily' ? 'daily' : 'weekly'
-          } reminder to log at least one activity in Numbers Dont Lie.\n\nOpen the dashboard and use the Record tab.\n`,
+          } reminder to log at least one activity in Numbers Dont Lie.\n\nOpen the dashboard and use the Weight & activity tab.\n`,
         );
         await this.prisma.privacySettings.update({
           where: { userId: pref.userId },

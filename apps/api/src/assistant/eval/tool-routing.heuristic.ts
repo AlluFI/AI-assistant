@@ -1,7 +1,9 @@
 import { inferChartToolCall } from '../chart-ui-blocks.util';
 import {
+  parseGenerateMealPlanIntent,
   parseLogActivityIntent,
   parseLogWeightIntent,
+  parseMarkMealEatenIntent,
   parseRegenerateMealIntent,
   parseShoppingListIntent,
 } from '../wingman-intent';
@@ -29,6 +31,13 @@ export function inferExpectedTools(message: string): string[] {
   ) {
     tools.push('update_nutrition_targets');
   }
+  if (
+    /snack(s)? per day|meal times?|preferred meal|when (do )?i eat|breakfast at|lunch at/i.test(
+      lower,
+    )
+  ) {
+    tools.push('update_nutrition_preferences');
+  }
   if (/calorie|protein target|macro|consumed today/i.test(lower)) {
     tools.push('get_nutrition_summary');
   }
@@ -49,9 +58,18 @@ export function inferExpectedTools(message: string): string[] {
 
 export function inferExpectedIntent(
   message: string,
-): 'log_activity' | 'log_weight' | 'regenerate_meal' | 'shopping_list' | null {
+):
+  | 'log_activity'
+  | 'log_weight'
+  | 'regenerate_meal'
+  | 'shopping_list'
+  | 'mark_meal_eaten'
+  | 'generate_meal_plan'
+  | null {
   if (parseLogActivityIntent(message)) return 'log_activity';
   if (parseLogWeightIntent(message)) return 'log_weight';
+  if (parseMarkMealEatenIntent(message)) return 'mark_meal_eaten';
+  if (parseGenerateMealPlanIntent(message)) return 'generate_meal_plan';
   if (parseRegenerateMealIntent(message)) return 'regenerate_meal';
   if (parseShoppingListIntent(message)) return 'shopping_list';
   return null;

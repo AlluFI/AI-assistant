@@ -55,7 +55,7 @@ Requires `GOOGLE_*` / `GITHUB_*` in env (see `.env.example`).
 
 ---
 
-## 4) Metrics — weight / wellness snapshots (UI: Record tab + Overview)
+## 4) Metrics — weight / wellness snapshots (UI: Weight & activity tab + Overview)
 
 | Method | Path | Notes |
 |--------|------|--------|
@@ -68,7 +68,7 @@ Requires `GOOGLE_*` / `GITHUB_*` in env (see `.env.example`).
 
 ---
 
-## 5) Activities — session logs (UI: Record tab)
+## 5) Activities — session logs (UI: Weight & activity tab)
 
 | Method | Path | Notes |
 |--------|------|--------|
@@ -84,7 +84,7 @@ Activity logs feed `GET /api/analytics/series/activity` (active days per week). 
 
 ---
 
-## 6) Record tab — UI smoke test (no extra API)
+## 6) Weight & activity tab — UI smoke test (no extra API)
 
 1. Sign in (demo: `demo@numbers.local` / `DemoPassword123!` after `pnpm demo:seed`).
 2. Open dashboard → **Record** tab.

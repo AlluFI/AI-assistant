@@ -19,6 +19,12 @@ export type AssistantUiBlock =
         | 'confirm_log_weight'
         | 'confirm_regenerate_meal'
         | 'confirm_generate_shopping_list'
+        | 'confirm_mark_meal_eaten'
+        | 'confirm_generate_meal_plan'
+        | 'confirm_onboarding_skip'
+        | 'confirm_onboarding_ai_targets'
+        | 'confirm_onboarding_formula_targets'
+        | 'confirm_onboarding_meal_defaults'
         | 'open_record'
         | 'open_nutrition'
         | 'open_insights';

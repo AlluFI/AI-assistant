@@ -11,6 +11,7 @@ import type { DailyAnalytics, TrendPoint, WeeklyAnalytics } from '../nutrition/t
 import { DailyCheckInPanel } from './DailyCheckInPanel'
 import { QuickFoodLogPanel } from './QuickFoodLogPanel'
 import { TodayDashboard } from './TodayDashboard'
+import { NutritionSetupBanner } from './NutritionSetupBanner'
 import type { TodaySummary } from './todayTypes'
 import type { SummaryComponents } from './dashboardUtils'
 import { weightProgressPct } from './dashboardUtils'
@@ -54,6 +55,7 @@ export type HealthOverviewProps = {
   fitnessGoalPrimary: string | null
   onViewInsights: () => void
   onViewNutrition?: () => void
+  nutritionTargetConfigured?: boolean
   quickActions?: ReactNode
   nutritionDaily?: DailyAnalytics | null
   nutritionTrend?: TrendPoint[]
@@ -84,6 +86,7 @@ export function HealthOverview({
   fitnessGoalPrimary,
   onViewInsights,
   onViewNutrition,
+  nutritionTargetConfigured = true,
   quickActions,
   nutritionDaily = null,
   nutritionTrend = [],
@@ -132,6 +135,10 @@ export function HealthOverview({
       {quickActions ?? null}
 
       {loadError ? <p className="err vizError">{loadError}</p> : null}
+
+      {!nutritionTargetConfigured ? (
+        <NutritionSetupBanner onOpenNutrition={onViewNutrition} />
+      ) : null}
 
       <TodayDashboard
         today={todaySummary}

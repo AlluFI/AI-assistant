@@ -7,7 +7,7 @@ import {
   MaxLength,
 } from 'class-validator';
 
-const COACHING_MODES = ['balanced', 'nutrition', 'wellness'] as const;
+const COACHING_MODES = ['balanced', 'nutrition', 'wellness', 'onboarding'] as const;
 
 export class PostAssistantMessageDto {
   @IsString()

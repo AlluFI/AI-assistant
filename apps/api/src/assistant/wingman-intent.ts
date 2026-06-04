@@ -171,3 +171,65 @@ export function parseShoppingListIntent(text: string): boolean {
     /\b(create|make|generate|build|open|show|need)\b/i.test(lower)
   );
 }
+
+export type ParsedMarkMealEaten = {
+  mealType: string;
+  mealTypeLabel: string;
+};
+
+/** "Mark dinner as eaten", "log lunch as eaten". */
+export function parseMarkMealEatenIntent(text: string): ParsedMarkMealEaten | null {
+  const lower = text.toLowerCase();
+  if (
+    !/\b(mark|log).*(eaten|ate|finished|done)\b/i.test(lower) &&
+    !/\b(eaten|finished).*(breakfast|lunch|dinner|snack)\b/i.test(lower)
+  ) {
+    return null;
+  }
+  for (const [phrase, mealType] of Object.entries(MEAL_ALIASES)) {
+    if (lower.includes(phrase)) {
+      return {
+        mealType,
+        mealTypeLabel: mealType.charAt(0).toUpperCase() + mealType.slice(1),
+      };
+    }
+  }
+  if (/\bdinner\b/i.test(lower)) {
+    return { mealType: 'dinner', mealTypeLabel: 'Dinner' };
+  }
+  if (/\blunch\b/i.test(lower)) {
+    return { mealType: 'lunch', mealTypeLabel: 'Lunch' };
+  }
+  if (/\bbreakfast\b/i.test(lower)) {
+    return { mealType: 'breakfast', mealTypeLabel: 'Breakfast' };
+  }
+  if (/\bsnack\b/i.test(lower)) {
+    return { mealType: 'snack', mealTypeLabel: 'Snack' };
+  }
+  return null;
+}
+
+export type ParsedGenerateMealPlan = {
+  duration: 'daily' | 'weekly';
+  startDate: string;
+};
+
+/** "Generate a weekly meal plan", "create my meal plan for this week". */
+export function parseGenerateMealPlanIntent(
+  text: string,
+): ParsedGenerateMealPlan | null {
+  const lower = text.toLowerCase();
+  if (
+    !/\b(generate|create|make|build|new)\b/i.test(lower) ||
+    !/\bmeal\s*plan\b/i.test(lower)
+  ) {
+    return null;
+  }
+  const weekly = /\b(week|weekly|7\s*days|seven\s*days)\b/i.test(lower);
+  const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+  const startDate = iso?.[1] ?? new Date().toISOString().slice(0, 10);
+  return {
+    duration: weekly ? 'weekly' : 'daily',
+    startDate,
+  };
+}

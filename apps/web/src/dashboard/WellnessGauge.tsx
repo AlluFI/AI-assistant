@@ -16,22 +16,25 @@ type Props = {
 }
 
 const COMPONENT_COLORS = ['#2563eb', '#7c3aed', '#0f766e', '#f97316']
-const COMPONENT_LABELS: Record<keyof SummaryComponents, string> = {
+const COMPONENT_LABELS: Partial<Record<keyof SummaryComponents, string>> = {
   bmi: 'BMI',
   activity: 'Activity',
   progress: 'Goal progress',
-  habits: 'Habits',
+  habits: 'Weekly activity',
+  checkIn: 'Check-in (7d)',
 }
 
 export function WellnessGauge({ score, components }: Props) {
   const s = score ?? 0
   const color = wellnessScoreColor(s)
   const componentRows = components
-    ? (Object.keys(COMPONENT_LABELS) as Array<keyof SummaryComponents>).map((key, i) => ({
-        name: COMPONENT_LABELS[key],
-        value: components[key],
-        fill: COMPONENT_COLORS[i % COMPONENT_COLORS.length],
-      }))
+    ? (Object.keys(COMPONENT_LABELS) as Array<keyof SummaryComponents>)
+        .filter((key) => components[key] != null)
+        .map((key, i) => ({
+          name: COMPONENT_LABELS[key] ?? key,
+          value: components[key] as number,
+          fill: COMPONENT_COLORS[i % COMPONENT_COLORS.length],
+        }))
     : []
 
   return (

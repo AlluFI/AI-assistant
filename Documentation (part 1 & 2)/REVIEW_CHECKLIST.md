@@ -56,7 +56,9 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 | Quick food log | Overview → **Quick food log**; `POST /api/food-log/quick`; daily intake updates in Today + nutrition analytics. |
 | Daily habits + wearable demo | Overview → **Daily check-in**; `PUT /api/daily-check-in`; optional `POST /api/daily-check-in/wearable-demo`. |
 | Adherence and streaks | After marking meals eaten, Today shows 7-day adherence % and protein/logging streaks. |
-| AI / formula nutrition targets | Nutrition tab → **AI recommend targets** / **Use formula targets**; Wingman `update_nutrition_targets` tool. |
+| AI / formula nutrition targets | Nutrition tab → **AI recommend targets** / **Use formula targets** (shows rationale); Wingman `update_nutrition_targets` tool. |
+| Meal times / snacks on plans | `preferred_meal_times` incl. `snack_2`; Wingman `update_nutrition_preferences`; Overview setup banner if no calorie target. |
+| Wingman meal actions | Static intents: mark meal eaten, generate meal plan (confirm CTAs); nudges for low protein streak & daily check-in. |
 | Multi-snack meal times | Set `snacksPerDay` ≥ 2; save profile; verify `snack` + `snack_2` time fields in Nutrition preferences. |
 | BMI/activity-driven personalization | Use "apply suggested targets" and profile activity changes; confirm nutrition targets and planning behavior adapt. |
 | Prompt strategy + params | Review `SECURITY_AND_AI_DECISIONS.md` and code usage for few-shot, sequential prompts, temperature/top-p rationale. |

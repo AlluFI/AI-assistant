@@ -15,6 +15,9 @@ import type { WingmanStreamEvent } from '../ai/llm/wingman-stream.types';
 import { MealPlansService } from '../meal-plans/meal-plans.service';
 import { ProfileService } from '../profile/profile.service';
 import { ShoppingListsService } from '../shopping-lists/shopping-lists.service';
+import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
+import { NutritionService } from '../nutrition/nutrition.service';
+import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
 import { ActivityRecordDto } from '../profile/dto/activity-record.dto';
 import { MetricRecordDto } from '../profile/dto/metric-record.dto';
 import type { AssistantUiBlock } from './assistant-ui.types';
@@ -35,6 +38,9 @@ export class AssistantService {
     private readonly profile: ProfileService,
     private readonly mealPlans: MealPlansService,
     private readonly shoppingLists: ShoppingListsService,
+    private readonly nutritionAnalytics: NutritionAnalyticsService,
+    private readonly nutrition: NutritionService,
+    private readonly onboarding: WingmanOnboardingService,
     private readonly threadSummary: ThreadSummaryService,
     private readonly userMemory: UserMemoryService,
   ) {}
@@ -75,11 +81,33 @@ export class AssistantService {
     };
   }
 
-  async createThread(userId: string, title?: string) {
+  async createThread(
+    userId: string,
+    title?: string,
+    coachingMode?: 'balanced' | 'nutrition' | 'wellness' | 'onboarding',
+  ) {
     return this.prisma.assistantThread.create({
-      data: { userId, title: title?.trim() || null },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
+      data: {
+        userId,
+        title: title?.trim() || null,
+        coachingMode: coachingMode ?? 'balanced',
+      },
+      select: {
+        id: true,
+        title: true,
+        coachingMode: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
+  }
+
+  getOnboarding(userId: string) {
+    return this.onboarding.getStatus(userId);
+  }
+
+  skipOnboarding(userId: string) {
+    return this.onboarding.skip(userId);
   }
 
   async listThreads(userId: string) {
@@ -146,11 +174,11 @@ export class AssistantService {
 
     if (status.weightDue) {
       lines.push(
-        'Would you like to record your weekly weight now? Tell me your weight in kg, or open the Record tab.',
+        'Would you like to record your weekly weight now? Tell me your weight in kg, or open the Weight & activity tab.',
       );
       uiBlocks.push({
         type: 'cta',
-        label: 'Open Record tab',
+        label: 'Open Weight & activity tab',
         action: 'open_record',
         payload: { focus: 'weight' },
       });
@@ -161,7 +189,7 @@ export class AssistantService {
       );
       uiBlocks.push({
         type: 'cta',
-        label: 'Open Record tab',
+        label: 'Open Weight & activity tab',
         action: 'open_record',
         payload: { focus: 'activity' },
       });
@@ -175,6 +203,29 @@ export class AssistantService {
         type: 'cta',
         label: 'View Insights',
         action: 'open_insights',
+      });
+    }
+
+    if (status.proteinLowStreak) {
+      lines.push(
+        `You've been under your protein target for ${status.proteinLowStreak} days in a row. Want a high-protein meal idea or to adjust your target?`,
+      );
+      uiBlocks.push({
+        type: 'cta',
+        label: 'Open Nutrition tab',
+        action: 'open_nutrition',
+      });
+    }
+
+    if (status.checkInDue) {
+      lines.push(
+        'A quick daily check-in (sleep, water, mood) helps your wellness picture — open Overview to log it.',
+      );
+      uiBlocks.push({
+        type: 'cta',
+        label: 'Open Overview',
+        action: 'open_record',
+        payload: { focus: 'overview' },
       });
     }
 
@@ -210,7 +261,7 @@ export class AssistantService {
     userId: string,
     threadId: string,
     content: string,
-    coachingMode?: 'balanced' | 'nutrition' | 'wellness',
+    coachingMode?: 'balanced' | 'nutrition' | 'wellness' | 'onboarding',
   ) {
     if (!this.chatEnabled()) {
       throw new BadRequestException(
@@ -246,7 +297,7 @@ export class AssistantService {
     userId: string,
     threadId: string,
     content: string,
-    coachingMode?: 'balanced' | 'nutrition' | 'wellness',
+    coachingMode?: 'balanced' | 'nutrition' | 'wellness' | 'onboarding',
   ): AsyncGenerator<WingmanStreamEvent & { messageId?: string }> {
     if (!this.chatEnabled()) {
       yield {
@@ -411,6 +462,135 @@ export class AssistantService {
       };
     }
 
+    if (dto.action === 'confirm_mark_meal_eaten') {
+      const versionId =
+        typeof dto.payload.versionId === 'string' ? dto.payload.versionId : '';
+      const mealId =
+        typeof dto.payload.mealId === 'string' ? dto.payload.mealId : '';
+      if (!versionId || !mealId) {
+        throw new BadRequestException('Invalid mark meal eaten payload');
+      }
+      const result = await this.mealPlans.logMealEaten(
+        versionId,
+        userId,
+        mealId,
+      );
+      const mealTitle =
+        typeof dto.payload.mealTitle === 'string'
+          ? dto.payload.mealTitle
+          : 'meal';
+      return {
+        ok: true,
+        action: dto.action,
+        result,
+        message: `Marked ${mealTitle} as eaten — added to today's intake.`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Nutrition tab',
+            action: 'open_nutrition' as const,
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_generate_meal_plan') {
+      const startDate =
+        typeof dto.payload.startDate === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(dto.payload.startDate)
+          ? dto.payload.startDate
+          : new Date().toISOString().slice(0, 10);
+      const duration =
+        dto.payload.duration === 'weekly' ? 'weekly' : 'daily';
+      const plan = await this.mealPlans.generate(userId, {
+        startDate,
+        duration,
+      });
+      return {
+        ok: true,
+        action: dto.action,
+        result: plan,
+        message: `Generated ${duration} meal plan starting ${startDate}. Open Nutrition to review.`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Nutrition tab',
+            action: 'open_nutrition' as const,
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_onboarding_skip') {
+      await this.onboarding.skip(userId);
+      return {
+        ok: true,
+        action: dto.action,
+        message:
+          'Setup skipped. You can finish your profile anytime in Profile, Nutrition, or by asking me here.',
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Overview',
+            action: 'open_record' as const,
+            payload: { focus: 'overview' },
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_onboarding_ai_targets') {
+      const row = await this.nutrition.applyAiSuggestedTargets(userId);
+      const next = await this.onboarding.getStatus(userId);
+      const macros = row.macroTargets as {
+        protein?: number;
+        carbs?: number;
+        fats?: number;
+      } | null;
+      return {
+        ok: true,
+        action: dto.action,
+        result: row,
+        message: `Saved AI targets: ${row.calorieTarget} kcal${
+          macros?.protein != null
+            ? ` · P ${macros.protein}g C ${macros.carbs}g F ${macros.fats}g`
+            : ''
+        }.\n\n${next.opener.content}`,
+        uiBlocks: next.opener.uiBlocks,
+      };
+    }
+
+    if (dto.action === 'confirm_onboarding_formula_targets') {
+      const row = await this.nutrition.applySuggestedTargets(userId);
+      const next = await this.onboarding.getStatus(userId);
+      const macros = row.macroTargets as {
+        protein?: number;
+        carbs?: number;
+        fats?: number;
+      } | null;
+      return {
+        ok: true,
+        action: dto.action,
+        result: row,
+        message: `Saved formula targets: ${row.calorieTarget} kcal${
+          macros?.protein != null
+            ? ` · P ${macros.protein}g C ${macros.carbs}g F ${macros.fats}g`
+            : ''
+        }.\n\n${next.opener.content}`,
+        uiBlocks: next.opener.uiBlocks,
+      };
+    }
+
+    if (dto.action === 'confirm_onboarding_meal_defaults') {
+      const done = await this.onboarding.applyMealDefaults(userId);
+      return {
+        ok: true,
+        action: dto.action,
+        message: done.message,
+        uiBlocks: done.uiBlocks,
+      };
+    }
+
     if (dto.action === 'confirm_generate_shopping_list') {
       const versionId =
         typeof dto.payload.versionId === 'string' ? dto.payload.versionId : '';
@@ -504,9 +684,12 @@ export class AssistantService {
   }
 
   private async reminderStatus(userId: string) {
-    const [metrics, activities] = await Promise.all([
+    const [metrics, activities, proteinLowStreak, checkInDue] =
+      await Promise.all([
       this.profile.listMetrics(userId, 30, 1),
       this.profile.listActivities(userId, 7, 1),
+      this.countLowProteinDays(userId, 3),
+      this.checkInMissingToday(userId),
     ]);
     const weightAt = metrics[0]?.recordedAt
       ? new Date(metrics[0].recordedAt as string | Date)
@@ -528,7 +711,47 @@ export class AssistantService {
       weightDue,
       activityDue,
       weeklyCheckIn,
+      proteinLowStreak:
+        proteinLowStreak >= 3 ? proteinLowStreak : null,
+      checkInDue,
     };
+  }
+
+  private async countLowProteinDays(
+    userId: string,
+    days: number,
+  ): Promise<number> {
+    let streak = 0;
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - i);
+      const date = d.toISOString().slice(0, 10);
+      const daily = await this.nutritionAnalytics.dailySummary(userId, date);
+      if (daily.macroPercentOfTarget.protein < 90 && daily.intake.protein > 0) {
+        streak++;
+      } else if (i === 0 && daily.intake.protein === 0) {
+        continue;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  private async checkInMissingToday(userId: string): Promise<boolean> {
+    const today = new Date().toISOString().slice(0, 10);
+    const row = await this.prisma.dailyCheckIn.findFirst({
+      where: {
+        userId,
+        date: today,
+        OR: [
+          { sleepHours: { not: null } },
+          { waterGlasses: { not: null } },
+          { mood: { not: null } },
+        ],
+      },
+    });
+    return !row;
   }
 
   private async hasAssistantTables(): Promise<boolean> {

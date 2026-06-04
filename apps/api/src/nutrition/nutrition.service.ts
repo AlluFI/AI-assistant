@@ -97,11 +97,15 @@ export class NutritionService {
         'Insufficient health profile data to compute targets',
       );
     }
-    return this.upsertNutritionProfile(userId, {
+    const row = await this.upsertNutritionProfile(userId, {
       calorieTarget: computed.calories,
       calorieTargetSource: 'computed',
       macroTargets: computed.macros,
     });
+    return {
+      ...row,
+      recommendationRationale: this.recommendationNoteForSource('computed'),
+    };
   }
 
   async applyAiSuggestedTargets(userId: string) {
@@ -168,17 +172,36 @@ Rules:
 
     const validated = validateAiTargetRecommendation(ai);
     if (!validated) {
-      return this.upsertNutritionProfile(userId, {
+      const row = await this.upsertNutritionProfile(userId, {
         calorieTarget: computed.calories,
         calorieTargetSource: 'computed',
         macroTargets: computed.macros,
       });
+      return {
+        ...row,
+        recommendationRationale: this.recommendationNoteForSource(
+          'computed',
+          'AI response was invalid; applied formula-based targets instead.',
+        ),
+      };
     }
 
-    return this.upsertNutritionProfile(userId, {
+    const row = await this.upsertNutritionProfile(userId, {
       calorieTarget: validated.calories,
       calorieTargetSource: 'ai_suggested',
       macroTargets: validated.macros,
     });
+    return { ...row, recommendationRationale: validated.rationale ?? null };
+  }
+
+  recommendationNoteForSource(
+    source: string | null | undefined,
+    rationale?: string | null,
+  ): string | null {
+    if (rationale?.trim()) return rationale.trim();
+    if (source === 'computed') {
+      return 'Calculated with Mifflin–St Jeor from your weight, height, age, activity, and goal.';
+    }
+    return null;
   }
 }

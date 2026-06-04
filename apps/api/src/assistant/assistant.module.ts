@@ -13,6 +13,7 @@ import { AssistantWingmanService } from './assistant-wingman.service';
 import { AssistantService } from './assistant.service';
 import { ThreadSummaryService } from './thread-summary.service';
 import { UserMemoryService } from './user-memory.service';
+import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { UserMemoryService } from './user-memory.service';
     AssistantWingmanService,
     ThreadSummaryService,
     UserMemoryService,
+    WingmanOnboardingService,
   ],
   exports: [AssistantService],
 })

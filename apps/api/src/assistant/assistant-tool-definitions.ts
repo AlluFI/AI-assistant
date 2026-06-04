@@ -129,6 +129,88 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
   {
     type: 'function' as const,
     function: {
+      name: 'update_nutrition_preferences',
+      description:
+        "Updates meal schedule preferences: meals/snacks per day and preferred meal times (UTC). Use when the user asks to change snack count or when they eat breakfast, lunch, dinner, or snacks.",
+      parameters: {
+        type: 'object',
+        properties: {
+          meals_per_day: {
+            type: 'number',
+            description: 'Main meals per day (1–6)',
+          },
+          snacks_per_day: {
+            type: 'number',
+            description: 'Snacks per day (0–4); second snack uses snack_2 time key',
+          },
+          preferred_meal_times: {
+            type: 'object',
+            description:
+              'Slot keys (breakfast, lunch, dinner, snack, snack_2, …) to HH:MM times in 24h UTC',
+            additionalProperties: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_health_profile',
+      description:
+        'Updates health profile basics for setup: age, gender, height, weight, activity level, fitness goal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          age: { type: 'number' },
+          gender: {
+            type: 'string',
+            enum: ['female', 'male', 'non_binary', 'prefer_not_say', 'other'],
+          },
+          height_cm: { type: 'number' },
+          weight_kg: { type: 'number' },
+          activity_level: {
+            type: 'string',
+            enum: ['sedentary', 'light', 'moderate', 'active', 'very_active'],
+          },
+          fitness_goal: {
+            type: 'string',
+            enum: [
+              'weight_loss',
+              'muscle_gain',
+              'general_fitness',
+              'maintenance',
+            ],
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_daily_check_in',
+      description:
+        "Returns daily check-in habits (sleep hours, water glasses, mood 1–5, optional steps). Week view includes 7-day habits score used in wellness score.",
+      parameters: {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            enum: ['day', 'week'],
+            description: 'day = single date; week = last 7 days ending on date',
+          },
+          date: {
+            type: 'string',
+            description: 'YYYY-MM-DD (default today)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'get_nutrition_summary',
       description: 'Calorie and macro intake vs targets for a day or week.',
       parameters: {

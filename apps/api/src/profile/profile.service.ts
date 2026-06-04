@@ -168,6 +168,26 @@ export class ProfileService {
     };
   }
 
+  private async wellnessScoreForUser(
+    userId: string,
+    profile: {
+      weightKg: Prisma.Decimal | null;
+      heightCm: Prisma.Decimal | null;
+      weeklyActivityDays: number | null;
+      activityLevel: string | null;
+      targetWeightKg: Prisma.Decimal | null;
+      fitnessGoalPrimary: string | null;
+    },
+    snapshot: {
+      weightKg: number | null;
+      heightCm: number | null;
+      weeklyActivityDays: number | null;
+    },
+  ) {
+    const checkIn = await this.analytics.recentCheckInHabitsScore(userId, 7);
+    return this.analytics.wellnessScore(profile, snapshot, checkIn);
+  }
+
   /** Persists a starting metric point when the user first supplies weight (and related fields). */
   private async ensureProfileBaselineSnapshot(
     userId: string,
@@ -187,7 +207,11 @@ export class ProfileService {
     };
     if (!hasWellnessInputs(profile, snapshot)) return;
 
-    const { score, bmi } = this.analytics.wellnessScore(profile, snapshot);
+    const { score, bmi } = await this.wellnessScoreForUser(
+      userId,
+      profile,
+      snapshot,
+    );
     if (score == null) return;
 
     const existing = await this.prisma.healthMetricSnapshot.findFirst({
@@ -450,7 +474,7 @@ export class ProfileService {
       throw new BadRequestException('Weight entry has no weight value.');
     }
 
-    const { score, bmi } = this.analytics.wellnessScore(profile, {
+    const { score, bmi } = await this.wellnessScoreForUser(userId, profile, {
       weightKg,
       heightCm:
         existing.heightCm != null
@@ -582,7 +606,7 @@ export class ProfileService {
 
     const recordedAt = parseRecordedAt(dto.recordedAt);
 
-    const { score, bmi } = this.analytics.wellnessScore(profile, {
+    const { score, bmi } = await this.wellnessScoreForUser(userId, profile, {
       weightKg: dto.weightKg ?? profile.weightKg?.toNumber() ?? null,
       heightCm: dto.heightCm ?? profile.heightCm?.toNumber() ?? null,
       weeklyActivityDays:

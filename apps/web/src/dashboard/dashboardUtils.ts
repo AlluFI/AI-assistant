@@ -3,6 +3,7 @@ export type SummaryComponents = {
   activity: number
   progress: number
   habits: number
+  checkIn?: number
 }
 
 export type BmiBand = {

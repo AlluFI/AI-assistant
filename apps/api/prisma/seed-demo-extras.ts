@@ -1,5 +1,5 @@
 /**
- * Demo user extras: activity logs (Record tab) + hidden nutrition intake history (charts only).
+ * Demo user extras: activity logs (Weight & activity tab) + hidden nutrition intake history (charts only).
  * Run after demo-seed.sql: pnpm demo:seed
  */
 import 'dotenv/config';

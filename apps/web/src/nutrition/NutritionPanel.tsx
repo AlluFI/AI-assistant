@@ -88,6 +88,7 @@ export function NutritionPanel({
   const [shoppingModalOpen, setShoppingModalOpen] = useState(false)
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false)
   const [insights, setInsights] = useState<NutritionInsights | null>(null)
+  const [targetRationale, setTargetRationale] = useState<string | null>(null)
 
   const loadProfile = useCallback(async () => {
     try {
@@ -270,6 +271,7 @@ export function NutritionPanel({
       const body = await apiPost<{
         calorieTarget?: number
         macroTargets?: { protein?: number; carbs?: number; fats?: number }
+        recommendationRationale?: string | null
       }>('/nutrition/profile/apply-suggested-targets', accessToken)
       if (body.calorieTarget) setCalorieTarget(String(body.calorieTarget))
       if (body.macroTargets) {
@@ -277,6 +279,7 @@ export function NutritionPanel({
         setMacroCarbs(String(body.macroTargets.carbs ?? ''))
         setMacroFats(String(body.macroTargets.fats ?? ''))
       }
+      setTargetRationale(body.recommendationRationale?.trim() || null)
       setMessage('Applied calorie and macro targets from your health profile')
       await loadProfile()
       await loadDailyAnalytics()
@@ -295,6 +298,7 @@ export function NutritionPanel({
         calorieTarget?: number
         macroTargets?: { protein?: number; carbs?: number; fats?: number }
         calorieTargetSource?: string
+        recommendationRationale?: string | null
       }>('/nutrition/profile/apply-ai-targets', accessToken)
       if (body.calorieTarget) setCalorieTarget(String(body.calorieTarget))
       if (body.macroTargets) {
@@ -302,6 +306,7 @@ export function NutritionPanel({
         setMacroCarbs(String(body.macroTargets.carbs ?? ''))
         setMacroFats(String(body.macroTargets.fats ?? ''))
       }
+      setTargetRationale(body.recommendationRationale?.trim() || null)
       const source = body.calorieTargetSource === 'ai_suggested' ? 'AI' : 'formula'
       setMessage(`Applied ${source} calorie and macro recommendations from your health profile`)
       await loadProfile()
@@ -500,6 +505,11 @@ export function NutritionPanel({
             Save preferences
           </button>
         </div>
+        {targetRationale ? (
+          <p className="hint nutritionTargetRationale" role="status">
+            {targetRationale}
+          </p>
+        ) : null}
       </section>
 
       <section className="card cardWide">

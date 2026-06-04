@@ -1,4 +1,5 @@
 import type { MealSlot } from './meal-plans.types';
+import { applyScheduleToMeals } from './meal-plan-schedule.util';
 
 export function fallbackMealStructure(
   prefs: Record<string, unknown>,
@@ -34,7 +35,7 @@ export function fallbackMealStructure(
       });
     });
   }
-  return { meals };
+  return { meals: applyScheduleToMeals(meals, prefs, startDate) };
 }
 
 /** Align AI structure with meals_per_day + snacks_per_day so calorie budgets stay correct. */
@@ -73,5 +74,5 @@ export function enforceMealStructureSlots(
       });
     }
   }
-  return { meals };
+  return { meals: applyScheduleToMeals(meals, prefs, startDate) };
 }

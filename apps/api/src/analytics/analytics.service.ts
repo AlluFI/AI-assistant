@@ -7,6 +7,7 @@ import {
   weeklyActiveDaysFromLogs,
 } from './activity-week.util';
 import { hasWellnessInputs } from './analytics-wellness.util';
+import { averageCheckInScore } from './check-in-wellness.util';
 
 export type { HealthProfileLike } from './analytics-wellness.util';
 import type { HealthProfileLike } from './analytics-wellness.util';
@@ -88,6 +89,7 @@ export class AnalyticsService {
       heightCm: number | null;
       weeklyActivityDays: number | null;
     },
+    checkInHabitsScore?: number | null,
   ): { score: number | null; bmi: number | null; bmiClass: string | null } {
     const w = snapshot.weightKg ?? num(profile.weightKg);
     const h = snapshot.heightCm ?? num(profile.heightCm);
@@ -102,17 +104,54 @@ export class AnalyticsService {
     const habitsScore = this.habitsComponentScore(
       snapshot.weeklyActivityDays ?? profile.weeklyActivityDays,
     );
+    const checkIn = checkInHabitsScore ?? null;
     const score = Math.round(
-      bmiScore * 0.3 +
-        activityScore * 0.3 +
-        progressScore * 0.2 +
-        habitsScore * 0.2,
+      checkIn != null
+        ? bmiScore * 0.28 +
+            activityScore * 0.28 +
+            progressScore * 0.19 +
+            habitsScore * 0.125 +
+            checkIn * 0.125
+        : bmiScore * 0.3 +
+            activityScore * 0.3 +
+            progressScore * 0.2 +
+            habitsScore * 0.2,
     );
     return {
       score: Math.max(0, Math.min(100, score)),
       bmi,
       bmiClass,
     };
+  }
+
+  /** Last N days of check-ins with sleep, water, or mood for wellness habits. */
+  async recentCheckInHabitsScore(
+    userId: string,
+    days = 7,
+  ): Promise<number | null> {
+    const end = new Date();
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    const startDate = start.toISOString().slice(0, 10);
+    const rows = await this.prisma.dailyCheckIn.findMany({
+      where: {
+        userId,
+        date: { gte: startDate },
+        OR: [
+          { sleepHours: { not: null } },
+          { waterGlasses: { not: null } },
+          { mood: { not: null } },
+        ],
+      },
+      select: { sleepHours: true, waterGlasses: true, mood: true },
+    });
+    return averageCheckInScore(
+      rows.map((r) => ({
+        sleepHours: r.sleepHours,
+        waterGlasses: r.waterGlasses,
+        mood: r.mood,
+      })),
+    );
   }
 
   async getSummary(userId: string) {
@@ -150,24 +189,32 @@ export class AnalyticsService {
       weeklyActivityDays: null,
     };
     const p = profile ?? emptyProfile;
-    const { score, bmi, bmiClass } = this.wellnessScore(p, {
-      weightKg: w,
-      heightCm: h,
-      weeklyActivityDays: weekly,
-    });
+    const checkInHabits = await this.recentCheckInHabitsScore(userId, 7);
+    const { score, bmi, bmiClass } = this.wellnessScore(
+      p,
+      {
+        weightKg: w,
+        heightCm: h,
+        weeklyActivityDays: weekly,
+      },
+      checkInHabits,
+    );
+    const components =
+      profile && score != null
+        ? {
+            bmi: this.bmiComponentScore(bmi),
+            activity: this.activityComponentScore(profile.activityLevel),
+            progress: this.progressComponentScore(profile, w),
+            habits: this.habitsComponentScore(weekly),
+            ...(checkInHabits != null ? { checkIn: checkInHabits } : {}),
+          }
+        : null;
     return {
       bmi,
       bmiClassification: bmiClass,
       wellnessScore: score,
-      components:
-        profile && score != null
-          ? {
-              bmi: this.bmiComponentScore(bmi),
-              activity: this.activityComponentScore(profile.activityLevel),
-              progress: this.progressComponentScore(profile, w),
-              habits: this.habitsComponentScore(weekly),
-            }
-          : null,
+      components,
+      checkInWeekScore: checkInHabits,
       latestMetricAt: latest?.recordedAt ?? null,
     };
   }
@@ -201,7 +248,8 @@ export class AnalyticsService {
     };
     if (!hasWellnessInputs(profile, snapshot)) return null;
 
-    const { score, bmi } = this.wellnessScore(profile, snapshot);
+    const checkIn = await this.recentCheckInHabitsScore(userId, 7);
+    const { score, bmi } = this.wellnessScore(profile, snapshot, checkIn);
     if (score == null) return null;
 
     return {

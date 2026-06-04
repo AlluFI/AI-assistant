@@ -118,7 +118,7 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] ≥ 5 turns context with follow-ups
 - [ ] Student explains model + temperature / top-p
 
-**Built in repo:** 9 tools (incl. `update_nutrition_targets`); `pnpm wingman:eval` 18/18; docs in `PROMPT_ENGINEERING.md`.
+**Built in repo:** 10 tools (incl. `update_nutrition_targets`, `update_nutrition_preferences`); `pnpm wingman:eval` 18/18; docs in `PROMPT_ENGINEERING.md`.
 
 ---
 

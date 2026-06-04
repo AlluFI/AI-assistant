@@ -95,6 +95,7 @@ Target profile: ${JSON.stringify(prefs)}`;
       ],
     };
     const prompt = `Based on this strategy, create a meal structure for ${days} day(s) starting ${startDate}. Return JSON { meals: [{ dayIndex, mealType, scheduledAt ISO8601, title }] }.
+Use preferred_meal_times when provided (keys: breakfast, lunch, dinner, snack, snack_2, snack_3, snack_4 — ISO timestamps). Respect meals_per_day and snacks_per_day slot counts.
 Few-shot output shape example: ${JSON.stringify(mealExample)}
 Strategy: ${JSON.stringify(strategy)} Preferences: ${JSON.stringify(prefs)}`;
     if (!this.openai.apiKey) throw new Error('no api key');
@@ -131,6 +132,8 @@ Strategy: ${JSON.stringify(strategy)} Preferences: ${JSON.stringify(prefs)}`;
       calorie_target: calorieTarget,
       meals_per_day: nutritionProfile?.mealsPerDay ?? 3,
       snacks_per_day: nutritionProfile?.snacksPerDay ?? 0,
+      preferred_meal_times: nutritionProfile?.preferredMealTimes ?? {},
+      timezone: nutritionProfile?.timezone ?? 'UTC',
     };
   }
 

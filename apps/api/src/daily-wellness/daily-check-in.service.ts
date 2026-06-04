@@ -27,12 +27,16 @@ export class DailyCheckInService {
       sleepHours?: number | null;
       waterGlasses?: number | null;
       mood?: number | null;
+      steps?: number | null;
       source?: string;
     } = { source: 'user' };
 
     if (dto.sleepHours !== undefined) data.sleepHours = dto.sleepHours;
     if (dto.waterGlasses !== undefined) data.waterGlasses = dto.waterGlasses;
     if (dto.mood !== undefined) data.mood = dto.mood;
+    if (dto.steps !== undefined) {
+      data.steps = dto.steps != null ? Math.round(dto.steps) : null;
+    }
 
     return this.prisma.dailyCheckIn.upsert({
       where: { userId_date: { userId, date } },
@@ -42,6 +46,7 @@ export class DailyCheckInService {
         sleepHours: dto.sleepHours ?? null,
         waterGlasses: dto.waterGlasses ?? null,
         mood: dto.mood ?? null,
+        steps: dto.steps != null ? Math.round(dto.steps) : null,
         source: 'user',
       },
       update: data,

@@ -31,6 +31,7 @@ export function DailyCheckInPanel({
   const [sleepHours, setSleepHours] = useState('')
   const [waterGlasses, setWaterGlasses] = useState('')
   const [mood, setMood] = useState('')
+  const [steps, setSteps] = useState('')
   const [demoSteps, setDemoSteps] = useState('8500')
   const [demoSleep, setDemoSleep] = useState('7.5')
   const [saving, setSaving] = useState(false)
@@ -39,6 +40,7 @@ export function DailyCheckInPanel({
     setSleepHours(checkIn?.sleepHours != null ? String(checkIn.sleepHours) : '')
     setWaterGlasses(checkIn?.waterGlasses != null ? String(checkIn.waterGlasses) : '')
     setMood(checkIn?.mood != null ? String(checkIn.mood) : '')
+    setSteps(checkIn?.steps != null ? String(checkIn.steps) : '')
   }, [checkIn, date])
 
   async function saveCheckIn() {
@@ -50,6 +52,7 @@ export function DailyCheckInPanel({
         sleepHours: sleepHours.trim() ? Number(sleepHours) : undefined,
         waterGlasses: waterGlasses.trim() ? Math.round(Number(waterGlasses)) : undefined,
         mood: mood.trim() ? Math.round(Number(mood)) : undefined,
+        steps: steps.trim() ? Math.round(Number(steps)) : undefined,
       })
       setMessage('Daily check-in saved')
       onSaved()
@@ -83,7 +86,10 @@ export function DailyCheckInPanel({
   return (
     <section className="card todayCheckIn">
       <h2>Daily check-in</h2>
-      <p className="hint">Track sleep, hydration, and mood — used for wellness coaching.</p>
+      <p className="hint">
+        Sleep, water, and mood feed your wellness score (about 12.5% from your 7-day
+        check-in average). Optional steps appear on Today and in Wingman.
+      </p>
       <div className="formGrid">
         <label>
           Sleep (hours)
@@ -119,11 +125,24 @@ export function DailyCheckInPanel({
             onChange={(e) => setMood(e.target.value)}
           />
         </label>
+        <label>
+          Steps (optional)
+          <input
+            type="number"
+            min={0}
+            max={100000}
+            step={1}
+            placeholder="e.g. 8500"
+            value={steps}
+            disabled={disabled}
+            onChange={(e) => setSteps(e.target.value)}
+          />
+        </label>
       </div>
-      {checkIn?.steps != null ? (
+      {checkIn?.source === 'wearable_demo' && checkIn.steps != null ? (
         <p className="hint">
-          Wearable steps today: <strong>{checkIn.steps.toLocaleString()}</strong>
-          {checkIn.source === 'wearable_demo' ? ' (demo import)' : ''}
+          Steps were last imported from demo wearable data — save above to record your own
+          count.
         </p>
       ) : null}
       <div className="row">

@@ -10,6 +10,8 @@ export type TodaySummary = {
     steps: number | null
     source: string
   } | null
+  checkInDayScore: number | null
+  checkInWeekScore: number | null
   nextMeal: {
     planId: string
     dayIndex: number

@@ -40,6 +40,14 @@ export class UpsertDailyCheckInDto {
   @Min(1)
   @Max(5)
   mood?: number;
+
+  @ApiPropertyOptional({ description: 'Daily step count (manual log)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  steps?: number;
 }
 
 export class WearableDemoSyncDto {

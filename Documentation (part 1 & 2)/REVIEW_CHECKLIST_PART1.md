@@ -8,7 +8,7 @@ Use this in live project review or demo.
 
 | Doc | Use it for |
 |-----|------------|
-| `TEST_MATRIX.md` | Endpoint list by feature (incl. Record tab, activities, PATCH/DELETE) |
+| `TEST_MATRIX.md` | Endpoint list by feature (incl. Weight & activity tab, activities, PATCH/DELETE) |
 | `OPERATIONS_SECURITY.md` | Transit/at-rest, Compose runbook, duplicate metrics, throttling |
 | `SECURITY_AND_AI_DECISIONS.md` | “Student can explain” prompts |
 | `REQUIREMENTS_AUDIT.local.md` | Private gap analysis vs requirements (gitignored) |
@@ -112,7 +112,7 @@ The first column follows that checklist top to bottom. Wording is shortened when
 - `GET/PATCH /api/profile`, consents, `GET /api/analytics/summary`  
 - `GET /api/analytics/series/weight`, `GET /api/analytics/series/wellness`, `GET /api/analytics/series/activity`, `GET /api/analytics/summaries/progress`  
 - `GET/POST/PATCH/DELETE /api/profile/metrics`  
-- **Record tab:** `GET/POST/PATCH/DELETE /api/profile/activities`, history filters, edit flows (see `TEST_MATRIX.md` §5–6)
+- **Weight & activity tab:** `GET/POST/PATCH/DELETE /api/profile/activities`, history filters, edit flows (see `TEST_MATRIX.md` §5–6)
 
 ### 5) AI insights (step 5)
 

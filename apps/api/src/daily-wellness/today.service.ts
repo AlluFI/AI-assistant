@@ -12,6 +12,7 @@ import {
   computeStreaks,
 } from './adherence.util';
 import { DailyCheckInService } from './daily-check-in.service';
+import { dayCheckInScore } from '../analytics/check-in-wellness.util';
 
 @Injectable()
 export class TodayService {
@@ -51,6 +52,15 @@ export class TodayService {
       nutrition.target.calories - nutrition.intake.calories,
     );
 
+    const checkInDayScore = checkIn
+      ? dayCheckInScore({
+          sleepHours: checkIn.sleepHours,
+          waterGlasses: checkIn.waterGlasses,
+          mood: checkIn.mood,
+        })
+      : null;
+    const checkInWeekScore = summary.checkInWeekScore ?? null;
+
     return {
       date: today,
       nutrition: {
@@ -58,6 +68,8 @@ export class TodayService {
         caloriesRemaining,
       },
       checkIn,
+      checkInDayScore,
+      checkInWeekScore,
       nextMeal,
       reminders,
       activityWeek,

@@ -54,7 +54,7 @@ Quick manual verification matrix for review. Routes are under **`/api`**. Authen
 
 ---
 
-## 4) Metrics and activities (UI: Record tab)
+## 4) Metrics and activities (UI: Weight & activity tab)
 
 | Method | Path | Notes |
 |--------|------|--------|

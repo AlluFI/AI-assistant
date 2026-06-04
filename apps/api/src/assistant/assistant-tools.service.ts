@@ -9,10 +9,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ProfileService } from '../profile/profile.service';
 import { NutritionProfileUpdateDto } from '../nutrition/dto/nutrition-profile-update.dto';
+import { ProfileUpdateDto } from '../profile/dto/profile-update.dto';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { RecipesService } from '../recipes/recipes.service';
 import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
+import {
+  averageCheckInScore,
+  dayCheckInScore,
+} from '../analytics/check-in-wellness.util';
 import { weekdayForDate } from './weekly-meal-plan-format.util';
 
 /** Executes wingman tool calls against existing Nest services (JWT-scoped userId). */
@@ -41,6 +46,12 @@ export class AssistantToolsService {
         return this.getNutritionSummary(userId, args);
       case 'update_nutrition_targets':
         return this.updateNutritionTargets(userId, args);
+      case 'update_nutrition_preferences':
+        return this.updateNutritionPreferences(userId, args);
+      case 'update_health_profile':
+        return this.updateHealthProfile(userId, args);
+      case 'get_daily_check_in':
+        return this.getDailyCheckIn(userId, args);
       case 'get_chart_data':
         return this.getChartData(userId, args);
       case 'search_recipes':
@@ -523,7 +534,9 @@ export class AssistantToolsService {
     }
   }
 
-  private formatNutritionTargetsResult(row: NutritionProfile) {
+  private formatNutritionTargetsResult(
+    row: NutritionProfile & { recommendationRationale?: string | null },
+  ) {
     const macros = row.macroTargets as {
       protein?: number;
       carbs?: number;
@@ -540,8 +553,229 @@ export class AssistantToolsService {
             fats: macros.fats ?? null,
           }
         : null,
+      recommendationRationale: row.recommendationRationale ?? null,
       message:
         'Saved calorie and macro targets. Meal plans and nutrition summaries will use these values.',
+    };
+  }
+
+  private async updateHealthProfile(
+    userId: string,
+    args: Record<string, unknown>,
+  ) {
+    const dto: ProfileUpdateDto = {};
+    if (args.age != null) {
+      const age = Math.round(Number(args.age));
+      if (!Number.isFinite(age) || age < 10 || age > 120) {
+        throw new BadRequestException('age must be between 10 and 120');
+      }
+      dto.age = age;
+    }
+    if (args.gender != null) {
+      dto.gender = this.enumArg(
+        args.gender,
+        ['female', 'male', 'non_binary', 'prefer_not_say', 'other'],
+        'gender',
+      ) ?? undefined;
+    }
+    if (args.height_cm != null) {
+      const h = Number(args.height_cm);
+      if (!Number.isFinite(h) || h < 50 || h > 260) {
+        throw new BadRequestException('height_cm must be between 50 and 260');
+      }
+      dto.heightCm = h;
+    }
+    if (args.weight_kg != null) {
+      const w = Number(args.weight_kg);
+      if (!Number.isFinite(w) || w < 20 || w > 400) {
+        throw new BadRequestException('weight_kg must be between 20 and 400');
+      }
+      dto.weightKg = w;
+      dto.startingWeightKg = w;
+    }
+    if (args.activity_level != null) {
+      dto.activityLevel = this.enumArg(
+        args.activity_level,
+        ['sedentary', 'light', 'moderate', 'active', 'very_active'],
+        'activity_level',
+      ) ?? undefined;
+    }
+    if (args.fitness_goal != null) {
+      dto.fitnessGoalPrimary = this.enumArg(
+        args.fitness_goal,
+        ['weight_loss', 'muscle_gain', 'general_fitness', 'maintenance'],
+        'fitness_goal',
+      ) ?? undefined;
+    }
+
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException(
+        'Provide at least one of age, gender, height_cm, weight_kg, activity_level, fitness_goal',
+      );
+    }
+
+    const result = await this.profile.upsert(userId, dto);
+    return {
+      updated: true,
+      profile: result.profile,
+      message: 'Saved health profile fields.',
+    };
+  }
+
+  private async updateNutritionPreferences(
+    userId: string,
+    args: Record<string, unknown>,
+  ) {
+    const patch: NutritionProfileUpdateDto = {};
+
+    if (args.meals_per_day != null) {
+      const meals = Math.round(Number(args.meals_per_day));
+      if (!Number.isFinite(meals) || meals < 1 || meals > 6) {
+        throw new BadRequestException('meals_per_day must be between 1 and 6');
+      }
+      patch.mealsPerDay = meals;
+    }
+
+    if (args.snacks_per_day != null) {
+      const snacks = Math.round(Number(args.snacks_per_day));
+      if (!Number.isFinite(snacks) || snacks < 0 || snacks > 4) {
+        throw new BadRequestException('snacks_per_day must be between 0 and 4');
+      }
+      patch.snacksPerDay = snacks;
+    }
+
+    const timesRaw = args.preferred_meal_times;
+    if (timesRaw != null) {
+      if (typeof timesRaw !== 'object' || Array.isArray(timesRaw)) {
+        throw new BadRequestException(
+          'preferred_meal_times must be an object of slot keys to HH:MM strings',
+        );
+      }
+      const out: Record<string, string> = {};
+      for (const [key, val] of Object.entries(
+        timesRaw as Record<string, unknown>,
+      )) {
+        if (typeof val !== 'string' || !/^\d{1,2}:\d{2}$/.test(val.trim())) {
+          throw new BadRequestException(
+            `preferred_meal_times.${key} must be HH:MM (24h)`,
+          );
+        }
+        const [h, m] = val.trim().split(':').map(Number);
+        if (h < 0 || h > 23 || m < 0 || m > 59) {
+          throw new BadRequestException(`Invalid time for ${key}`);
+        }
+        const d = new Date('2026-01-01T12:00:00.000Z');
+        d.setUTCHours(h, m, 0, 0);
+        out[key] = d.toISOString();
+      }
+      patch.preferredMealTimes = out;
+    }
+
+    if (
+      patch.mealsPerDay === undefined &&
+      patch.snacksPerDay === undefined &&
+      patch.preferredMealTimes === undefined
+    ) {
+      throw new BadRequestException(
+        'Provide meals_per_day, snacks_per_day, and/or preferred_meal_times',
+      );
+    }
+
+    const row = await this.nutrition.upsertNutritionProfile(userId, patch);
+    return {
+      updated: true,
+      mealsPerDay: row.mealsPerDay,
+      snacksPerDay: row.snacksPerDay,
+      preferredMealTimes: row.preferredMealTimes,
+      message:
+        'Saved meal schedule preferences. New meal plans will use these times.',
+    };
+  }
+
+  private async getDailyCheckIn(
+    userId: string,
+    args: Record<string, unknown>,
+  ) {
+    const period =
+      this.enumArg(args.period, ['day', 'week'], 'period') ?? 'day';
+    const date =
+      typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
+        ? args.date
+        : new Date().toISOString().slice(0, 10);
+
+    if (period === 'week') {
+      const end = new Date(`${date}T12:00:00.000Z`);
+      const start = new Date(end);
+      start.setUTCDate(start.getUTCDate() - 6);
+      const startDate = start.toISOString().slice(0, 10);
+      const rows = await this.prisma.dailyCheckIn.findMany({
+        where: { userId, date: { gte: startDate, lte: date } },
+        orderBy: { date: 'asc' },
+      });
+      const mapped = rows.map((r) => ({
+        date: r.date,
+        sleepHours: r.sleepHours,
+        waterGlasses: r.waterGlasses,
+        mood: r.mood,
+        steps: r.steps,
+        source: r.source,
+        dayScore: dayCheckInScore({
+          sleepHours: r.sleepHours,
+          waterGlasses: r.waterGlasses,
+          mood: r.mood,
+        }),
+      }));
+      const weekHabitsScore = averageCheckInScore(
+        rows.map((r) => ({
+          sleepHours: r.sleepHours,
+          waterGlasses: r.waterGlasses,
+          mood: r.mood,
+        })),
+      );
+      return {
+        period: 'week',
+        startDate,
+        endDate: date,
+        days: mapped,
+        weekHabitsScore,
+        wellnessNote:
+          weekHabitsScore != null
+            ? '7-day check-in habits average contributes ~12.5% to your wellness score.'
+            : 'Log sleep, water, or mood in Overview → Daily check-in to affect wellness score.',
+      };
+    }
+
+    const row = await this.prisma.dailyCheckIn.findUnique({
+      where: { userId_date: { userId, date } },
+    });
+    const weekHabitsScore = await this.analytics.recentCheckInHabitsScore(
+      userId,
+      7,
+    );
+    return {
+      period: 'day',
+      date,
+      checkIn: row
+        ? {
+            sleepHours: row.sleepHours,
+            waterGlasses: row.waterGlasses,
+            mood: row.mood,
+            steps: row.steps,
+            source: row.source,
+          }
+        : null,
+      dayScore: row
+        ? dayCheckInScore({
+            sleepHours: row.sleepHours,
+            waterGlasses: row.waterGlasses,
+            mood: row.mood,
+          })
+        : null,
+      weekHabitsScore,
+      wellnessNote:
+        weekHabitsScore != null
+          ? '7-day check-in habits average contributes ~12.5% to your wellness score.'
+          : 'No recent check-in data — log sleep, water, or mood on Overview.',
     };
   }
 

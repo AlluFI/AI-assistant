@@ -63,7 +63,8 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 | `get_nutrition_summary` | nutrition-analytics | “Calories today vs target?” |
 | `search_recipes` | recipes + RAG | “High protein lunch ideas” |
 | `get_chart_data` | analytics | “Show my weight trend” → `ui_blocks` chart |
-| `update_nutrition_targets` | nutrition | Set calorie/macro targets (AI, formula, or manual) |
+| `update_nutrition_targets` | nutrition | Set calorie/macro targets (AI, formula, or manual); returns `recommendationRationale` when applicable |
+| `update_nutrition_preferences` | nutrition | Meals/snacks per day and `preferred_meal_times` (incl. `snack_2`) |
 
 **Daily wellness (Overview):** `GET /today`, habits check-in, quick food log — see [DAILY_WELLNESS.md](./DAILY_WELLNESS.md).
 

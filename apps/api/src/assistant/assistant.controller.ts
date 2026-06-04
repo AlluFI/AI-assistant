@@ -47,6 +47,25 @@ export class AssistantController {
 
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
+  @Get('onboarding')
+  @ApiOperation({
+    summary: 'Wingman setup wizard status and opening message',
+  })
+  onboarding(@Req() req: AuthRequest) {
+    return this.assistant.getOnboarding(req.user.userId);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @Post('onboarding/skip')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Skip wingman setup wizard' })
+  skipOnboarding(@Req() req: AuthRequest) {
+    return this.assistant.skipOnboarding(req.user.userId);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
   @Post('actions/confirm')
   @ApiOperation({
     summary:
@@ -83,7 +102,11 @@ export class AssistantController {
     @Req() req: AuthRequest,
     @Body() body: CreateAssistantThreadDto,
   ) {
-    return this.assistant.createThread(req.user.userId, body.title);
+    return this.assistant.createThread(
+      req.user.userId,
+      body.title,
+      body.coachingMode,
+    );
   }
 
   @ApiBearerAuth('access-token')

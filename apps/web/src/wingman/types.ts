@@ -21,6 +21,12 @@ export type WingmanUiBlock =
         | 'confirm_log_weight'
         | 'confirm_regenerate_meal'
         | 'confirm_generate_shopping_list'
+        | 'confirm_mark_meal_eaten'
+        | 'confirm_generate_meal_plan'
+        | 'confirm_onboarding_skip'
+        | 'confirm_onboarding_ai_targets'
+        | 'confirm_onboarding_formula_targets'
+        | 'confirm_onboarding_meal_defaults'
         | 'open_record'
         | 'open_nutrition'
         | 'open_insights'
@@ -44,10 +50,24 @@ export type WingmanNudges = {
   uiBlocks?: WingmanUiBlock[]
 }
 
-export type WingmanCoachingMode = 'balanced' | 'nutrition' | 'wellness'
+export type WingmanCoachingMode = 'balanced' | 'nutrition' | 'wellness' | 'onboarding'
+
+export type WingmanOnboardingStepId =
+  | 'health_basics'
+  | 'nutrition_targets'
+  | 'meal_schedule'
+  | 'complete'
+
+export type WingmanOnboardingStatus = {
+  active: boolean
+  step: WingmanOnboardingStepId
+  steps: Array<{ id: WingmanOnboardingStepId; label: string; done: boolean }>
+  percentComplete: number
+  opener: { content: string; uiBlocks?: WingmanUiBlock[] }
+}
 
 export const WINGMAN_STARTER_PROMPTS: Record<
-  WingmanCoachingMode,
+  Exclude<WingmanCoachingMode, 'onboarding'>,
   readonly string[]
 > = {
   balanced: [
@@ -61,6 +81,8 @@ export const WINGMAN_STARTER_PROMPTS: Record<
     'Find high-protein dinner recipes',
     'Am I meeting my protein target?',
     'Create a shopping list from my plan',
+    'Mark dinner as eaten',
+    'Generate a weekly meal plan',
   ],
   wellness: [
     'How close am I to my weight goal?',

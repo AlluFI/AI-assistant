@@ -96,6 +96,49 @@ export function TodayDashboard({
             )}
           </div>
 
+          <div className="todayStat todayStatCheckIn">
+            <span className="todayStatLabel">Daily check-in</span>
+            {today?.checkIn &&
+            (today.checkIn.sleepHours != null ||
+              today.checkIn.waterGlasses != null ||
+              today.checkIn.mood != null) ? (
+              <>
+                <ul className="todayCheckInList">
+                  {today.checkIn.sleepHours != null ? (
+                    <li>
+                      Sleep <strong>{today.checkIn.sleepHours}h</strong>
+                    </li>
+                  ) : null}
+                  {today.checkIn.waterGlasses != null ? (
+                    <li>
+                      Water <strong>{today.checkIn.waterGlasses}</strong> glasses
+                    </li>
+                  ) : null}
+                  {today.checkIn.mood != null ? (
+                    <li>
+                      Mood <strong>{today.checkIn.mood}/5</strong>
+                    </li>
+                  ) : null}
+                  {today.checkIn.steps != null ? (
+                    <li>
+                      Steps <strong>{today.checkIn.steps.toLocaleString()}</strong>
+                    </li>
+                  ) : null}
+                </ul>
+                {today.checkInDayScore != null ? (
+                  <span className="hint">
+                    Today habits score: {today.checkInDayScore}/100
+                    {today.checkInWeekScore != null
+                      ? ` · 7-day avg ${today.checkInWeekScore}/100 (feeds wellness score)`
+                      : ''}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <p className="hint">Log sleep, water, and mood in the card below.</p>
+            )}
+          </div>
+
           <div className="todayStat">
             <span className="todayStatLabel">Activity this week</span>
             <strong className="todayStatValueSm">

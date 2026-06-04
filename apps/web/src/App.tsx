@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import { WEIGHT_ACTIVITY_TAB_LABEL } from './dashboard/dashboardTabLabels'
 import { HealthOverview } from './dashboard/HealthOverview'
 import type { TodaySummary } from './dashboard/todayTypes'
 import {
@@ -18,6 +19,7 @@ import type {
   WeeklyAnalytics,
 } from './nutrition/types'
 import { WingmanChat } from './wingman/WingmanChat'
+import type { WingmanOnboardingStatus } from './wingman/types'
 import './nutrition/nutrition.css'
 import { emptyProfileForm, profileFromApi, profileToPayload } from './profileFormModel'
 import {
@@ -100,6 +102,9 @@ export default function App() {
   const [chartDays, setChartDays] = useState(90)
   const [nutritionTrend, setNutritionTrend] = useState<TrendPoint[]>([])
   const [nutritionDaily, setNutritionDaily] = useState<DailyAnalytics | null>(null)
+  const [nutritionTargetConfigured, setNutritionTargetConfigured] = useState(true)
+  const [wingmanOnboarding, setWingmanOnboarding] =
+    useState<WingmanOnboardingStatus | null>(null)
   const [todaySummary, setTodaySummary] = useState<TodaySummary | null>(null)
   const [nutritionWeekly, setNutritionWeekly] = useState<WeeklyAnalytics | null>(null)
   const [nutritionInsights, setNutritionInsights] = useState<NutritionInsights | null>(null)
@@ -244,6 +249,11 @@ export default function App() {
     }
   }, [authApi])
 
+  const loadWingmanOnboarding = useCallback(async () => {
+    const res = await authApi.request<WingmanOnboardingStatus>('/assistant/onboarding')
+    if (res.response.ok) setWingmanOnboarding(res.data)
+  }, [authApi])
+
   const loadTrends = useCallback(
     async (days: number) => {
       const loadId = ++trendsLoadSeq.current
@@ -251,7 +261,8 @@ export default function App() {
       setBusy(true)
       setError(null)
       try {
-        const [w, ws, act, nut, daily, weekly, today] = await Promise.all([
+        const [w, ws, act, nut, daily, weekly, todayRes, nutProfile] =
+          await Promise.all([
           authApi.request<Point[]>(`/analytics/series/weight?days=${days}`),
           authApi.request<Point[]>(`/analytics/series/wellness?days=${days}`),
           authApi.request<unknown[]>(`/analytics/series/activity?days=${days}`),
@@ -259,6 +270,9 @@ export default function App() {
           authApi.request<DailyAnalytics>(`/nutrition-analytics/daily?date=${today}`),
           authApi.request<WeeklyAnalytics>(`/nutrition-analytics/weekly?end=${today}`),
           authApi.request<TodaySummary>(`/today?date=${today}`),
+          authApi.request<{
+            nutritionProfile?: { calorieTarget?: number | null }
+          }>('/nutrition/profile'),
         ])
         if (loadId !== trendsLoadSeq.current) return
         if (!w.response.ok) {
@@ -281,13 +295,24 @@ export default function App() {
         }
         if (daily.response.ok) setNutritionDaily(daily.data)
         if (weekly.response.ok) setNutritionWeekly(weekly.data)
-        if (today.response.ok) setTodaySummary(today.data)
+        if (todayRes.response.ok) setTodaySummary(todayRes.data)
+        if (nutProfile.response.ok) {
+          const cal = nutProfile.data?.nutritionProfile?.calorieTarget
+          setNutritionTargetConfigured(
+            typeof cal === 'number' && cal >= 800 && cal <= 6000,
+          )
+        }
       } finally {
         if (loadId === trendsLoadSeq.current) setBusy(false)
       }
     },
     [authApi],
   )
+
+  useEffect(() => {
+    if (!accessToken || showConsentOnboarding) return
+    void loadWingmanOnboarding()
+  }, [accessToken, showConsentOnboarding, loadWingmanOnboarding])
 
   useEffect(() => {
     if (!accessToken || dashboardView !== 'overview') return
@@ -1428,7 +1453,7 @@ export default function App() {
                   className={`secondary${dashboardView === 'record' ? ' active' : ''}`}
                   onClick={() => setDashboardView('record')}
                 >
-                  Record
+                  {WEIGHT_ACTIVITY_TAB_LABEL}
                 </button>
                 <button
                   type="button"
@@ -1486,9 +1511,15 @@ export default function App() {
                 }
                 onViewInsights={() => setDashboardView('insights')}
                 onViewNutrition={() => setDashboardView('nutrition')}
+                nutritionTargetConfigured={
+                  nutritionTargetConfigured && !wingmanOnboarding?.active
+                }
                 todaySummary={todaySummary}
                 accessToken={accessToken ?? ''}
-                onRefreshToday={() => void loadTrends(chartDays)}
+                onRefreshToday={() => {
+                  void loadSummary()
+                  void loadTrends(chartDays)
+                }}
                 onLogWeight={() => setDashboardView('record')}
                 onLogActivity={() => setDashboardView('record')}
                 setMessage={setMessage}
@@ -1732,7 +1763,7 @@ export default function App() {
             ) : null}
 
             {dashboardView === 'account' ? (
-              <div className="dashboardGrid">
+              <div className="dashboardGrid accountDashboard">
                 <section className="card">
                   <h2>Profile</h2>
                   <p className="hint">Customize how your account appears across the app.</p>
@@ -1862,6 +1893,26 @@ export default function App() {
                     </label>
                     <button type="submit" disabled={busy}>
                       Save account settings
+                    </button>
+                  </form>
+                </section>
+
+                <section className="card accountEmailCard">
+                  <h2>Change sign-in email</h2>
+                  <p className="hint">We will send a verification link to your new email before switching it.</p>
+                  <p className="hint">Current email: {meObj?.email ?? '-'}</p>
+                  <form onSubmit={requestEmailChange} className="form">
+                    <label>
+                      New email
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <button type="submit" disabled={busy}>
+                      Send verification link
                     </button>
                   </form>
                 </section>
@@ -2087,26 +2138,6 @@ export default function App() {
                 </section>
 
                 <section className="card">
-                  <h2>Change sign-in email</h2>
-                  <p className="hint">We will send a verification link to your new email before switching it.</p>
-                  <p className="hint">Current email: {meObj?.email ?? '-'}</p>
-                  <form onSubmit={requestEmailChange} className="form">
-                    <label>
-                      New email
-                      <input
-                        type="email"
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        required
-                      />
-                    </label>
-                    <button type="submit" disabled={busy}>
-                      Send verification link
-                    </button>
-                  </form>
-                </section>
-
-                <section className="card">
                   <h2>Deletion lifecycle</h2>
                   <p className="hint">Submit a deletion request to schedule account removal after the retention window.</p>
                   {devToolsEnabled ? (
@@ -2165,12 +2196,17 @@ export default function App() {
       {accessToken && !showConsentOnboarding ? (
         <WingmanChat
           authFetch={authApi.fetch}
+          onboarding={wingmanOnboarding}
+          onOnboardingRefresh={() => {
+            void loadWingmanOnboarding()
+            void loadTrends(chartDays)
+          }}
           showReminderDot={
             (weightReminderEnabled && weightReminderDue) ||
             (activityReminderCadence !== 'off' && activityReminderDue)
           }
-          onOpenRecord={() => {
-            setDashboardView('record')
+          onOpenRecord={(focus) => {
+            setDashboardView(focus === 'overview' ? 'overview' : 'record')
           }}
           onOpenNutrition={() => {
             setDashboardView('nutrition')
@@ -2180,6 +2216,9 @@ export default function App() {
           }}
           onDataChanged={() => {
             void refreshReminderStatus()
+            void loadWingmanOnboarding()
+            void loadSummary()
+            if (dashboardView === 'overview') void loadTrends(chartDays)
             if (dashboardView === 'record') void loadRecordData(logDays)
           }}
         />

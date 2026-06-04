@@ -12,7 +12,9 @@ export function buildWingmanSystemPrompt(opts: {
   const name = opts.displayName?.trim() || 'there';
   const mode = opts.responseMode === 'detailed' ? 'detailed' : 'concise';
   const coaching =
-    opts.coachingMode === 'nutrition' || opts.coachingMode === 'wellness'
+    opts.coachingMode === 'nutrition' ||
+    opts.coachingMode === 'wellness' ||
+    opts.coachingMode === 'onboarding'
       ? opts.coachingMode
       : 'balanced';
 
@@ -42,12 +44,14 @@ ${coachingModePromptSection(coaching)}
 - Call tools whenever the user asks about their data.
 - Use \`get_chart_data\` when the user asks to see a trend or chart (weight line, calorie trend, protein vs target, macro pie).
 - When the user asks to **set, update, or recommend** daily calorie/macro targets, call \`update_nutrition_targets\`: \`ai_recommend\` for personalized AI targets from their health profile, \`formula\` for Mifflin-St Jeor, \`manual\` when they give specific kcal or grams. Confirm the saved values in your reply.
+- When they ask to change **how many snacks**, **meal times**, or meals per day, call \`update_nutrition_preferences\` (slot keys: breakfast, lunch, dinner, snack, snack_2, … as HH:MM UTC).
+- For **sleep, water, mood, or steps** check-in data, call \`get_daily_check_in\` (period day or week). Logging is in Overview → Daily check-in (\`PUT /daily-check-in\`); recent check-ins contribute ~12.5% to wellness score.
 - For "how do I prepare/cook tonight's or tomorrow's dinner (or any meal slot)", call \`get_meal_plan\` for that date, then \`get_recipe\` with the meal's \`recipeId\`, or pass \`date\` + \`meal_type\` to \`get_recipe\`.
 - For "meal plan for the week" or similar, call \`get_meal_plan\` with \`scope: "week"\` and list **each day separately** — weekly plans vary by day; never assume all 7 days match day 1.
 - If a planned meal has no \`recipeId\`, tell the user to confirm recipes or regenerate the meal in the Nutrition tab — do not invent steps.
-- If data is missing, say so and suggest logging in the Record tab or Nutrition tab.
+- If data is missing, say so and suggest logging in the Weight & activity tab or Nutrition tab.
 - For logging weight or activities, tell the user they can say e.g. "record 1 hour tennis for today" and confirm — do not claim you saved data without user confirmation in the app.
-- For regenerating a planned meal or creating a shopping list, describe the action and let the app show a confirm button — never claim you changed the plan without confirmation.
+- For regenerating a planned meal, marking a meal eaten, generating a meal plan, or creating a shopping list, describe the action and let the app show a confirm button — never claim you changed the plan without confirmation.
 - After discussing protein, weight, or calories, you may offer: "Would you like to see a chart?"
 
 ## Units

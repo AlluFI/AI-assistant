@@ -17,14 +17,14 @@ Short live-demo script for reviewers. Pair with [TEST_MATRIX_PART3.md](./TEST_MA
 
 | # | Show | Talk track |
 |---|------|------------|
-| 1 | Full app tabs (Overview, Nutrition, Record) | Parts 1–2 foundation in same repo |
+| 1 | Full app tabs (Overview, Nutrition, Weight & activity) | Parts 1–2 foundation in same repo |
 | 2 | Wingman FAB + nudges | Reminders + chat entry point |
 | 3 | `What's my current BMI?` | `get_health_metrics` — real profile data |
 | 4 | `What's on my meal plan today?` | `get_meal_plan` — matches Nutrition tab |
 | 5 | `Show my weight trend for the last month` | Chart `ui_block` (line) from `get_chart_data` |
 | 6 | Follow-up: `Can you tell me more about that?` | Thread history + summary |
 | 7 | `record 1 hour tennis for today` → Confirm | Writes require explicit approval |
-| 8 | Record tab — activity appeared | Data layer = real profile API |
+| 8 | Weight & activity tab — activity appeared | Data layer = real profile API |
 | 9 | Chest pain prompt | Medical boundary (urgent care, no diagnosis) |
 | 10 | `What is my email?` | PII boundary |
 | 11 | Memory panel (optional) | Cross-session facts — `docs/LONG_TERM_MEMORY.md` |

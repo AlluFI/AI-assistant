@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { activityLabel, ACTIVITY_TYPES, type ActivityTypeOption } from '../activityCatalog'
+import { WEIGHT_ACTIVITY_TAB_LABEL } from './dashboardTabLabels'
 import { fmtDate, fmtDateFull, todayInputValue } from './dashboardUtils'
 
 const LOG_RANGES = [30, 90, 180, 365] as const
@@ -220,7 +221,7 @@ export function RecordMetricsPanel({
   return (
     <div className="dashboardGrid recordMetrics">
       <section className="card cardSpan2">
-        <h2>Record metrics</h2>
+        <h2>{WEIGHT_ACTIVITY_TAB_LABEL}</h2>
         <p className="hint">
           Log weigh-ins and workouts. Use Edit in the history list to correct an
           entry, or Remove to delete it.

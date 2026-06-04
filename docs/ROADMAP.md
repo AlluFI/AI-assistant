@@ -19,7 +19,7 @@
 - [x] `ui_blocks` chart rendering in web (line, bar, pie)
 - [x] Rolling thread summaries (rule + LLM)
 - [x] Suggested starter prompts
-- [x] Link to Record / Nutrition / Insights via CTAs
+- [x] Link to Weight & activity / Nutrition / Insights via CTAs
 
 ## Phase 3 — Coaching & actions
 

@@ -6,6 +6,7 @@ import {
   type WingmanCoachingMode,
   type WingmanMessage,
   type WingmanNudges,
+  type WingmanOnboardingStatus,
   type WingmanUiBlock,
 } from './types'
 import './wingman.css'
@@ -18,7 +19,9 @@ const STREAMING_ENABLED = import.meta.env.VITE_ASSISTANT_STREAMING !== 'false'
 type Props = {
   authFetch: AuthFetch
   showReminderDot: boolean
-  onOpenRecord: (focus?: 'weight' | 'activity') => void
+  onboarding?: WingmanOnboardingStatus | null
+  onOnboardingRefresh?: () => void
+  onOpenRecord: (focus?: 'weight' | 'activity' | 'overview') => void
   onOpenNutrition: (opts?: { shoppingListId?: string }) => void
   onOpenInsights: () => void
   onDataChanged: () => void
@@ -28,6 +31,15 @@ type ThreadPayload = {
   id: string
   coachingMode?: WingmanCoachingMode
   messages: WingmanMessage[]
+}
+
+function onboardingOpenerMessage(opener: WingmanOnboardingStatus['opener']): WingmanMessage {
+  return {
+    id: `onboarding-opener-${Date.now()}`,
+    role: 'assistant',
+    content: opener.content,
+    uiBlocks: opener.uiBlocks,
+  }
 }
 
 function nudgesToMessage(nudges: WingmanNudges): WingmanMessage {
@@ -74,6 +86,8 @@ function renderUiBlock(
 export function WingmanChat({
   authFetch,
   showReminderDot,
+  onboarding = null,
+  onOnboardingRefresh,
   onOpenRecord,
   onOpenNutrition,
   onOpenInsights,
@@ -95,6 +109,11 @@ export function WingmanChat({
     updatedAt: string
   } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const onboardingAutoOpened = useRef(false)
+  const onboardingActive = Boolean(onboarding?.active)
+  const effectiveCoachingMode: WingmanCoachingMode = onboardingActive
+    ? 'onboarding'
+    : coachingMode
 
   const scrollToBottom = useCallback(() => {
     const el = listRef.current
@@ -109,14 +128,18 @@ export function WingmanChat({
     if (threadId) return threadId
     const res = await authFetch('/assistant/threads', {
       method: 'POST',
-      body: JSON.stringify({ title: 'Wingman' }),
+      body: JSON.stringify({
+        title: onboardingActive ? 'Setup' : 'Wingman',
+        coachingMode: onboardingActive ? 'onboarding' : undefined,
+      }),
     })
     const body = await readApiJson<{ id: string }>(res)
     if (!res.ok) throw new Error('Could not start chat thread')
     setThreadId(body.id)
     sessionStorage.setItem(THREAD_KEY, body.id)
+    if (onboardingActive) setCoachingMode('onboarding')
     return body.id
-  }, [authFetch, threadId])
+  }, [authFetch, onboardingActive, threadId])
 
   const loadThread = useCallback(
     async (id: string) => {
@@ -135,7 +158,11 @@ export function WingmanChat({
           content: m.content,
           uiBlocks: m.uiBlocks as WingmanUiBlock[] | undefined,
         }))
-      if (body.coachingMode === 'nutrition' || body.coachingMode === 'wellness') {
+      if (
+        body.coachingMode === 'nutrition' ||
+        body.coachingMode === 'wellness' ||
+        body.coachingMode === 'onboarding'
+      ) {
         setCoachingMode(body.coachingMode)
       }
       if (mapped.length > 0) {
@@ -177,6 +204,13 @@ export function WingmanChat({
     setMessages([nudgesToMessage(nudges)])
   }, [authFetch])
 
+  const showOnboardingOpener = useCallback(() => {
+    if (onboarding?.active && onboarding.opener) {
+      setCoachingMode('onboarding')
+      setMessages([onboardingOpenerMessage(onboarding.opener)])
+    }
+  }, [onboarding])
+
   const openPanel = useCallback(async () => {
     setOpen(true)
     setError(null)
@@ -189,14 +223,32 @@ export function WingmanChat({
         if (ok) return
       }
       await ensureThread()
-      await loadOpening()
+      if (onboarding?.active && onboarding.opener) {
+        showOnboardingOpener()
+      } else {
+        await loadOpening()
+      }
       void loadMemory()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open wingman')
     } finally {
       setBusy(false)
     }
-  }, [ensureThread, loadMemory, loadOpening, loadThread, threadId])
+  }, [
+    ensureThread,
+    loadMemory,
+    loadOpening,
+    loadThread,
+    onboarding,
+    showOnboardingOpener,
+    threadId,
+  ])
+
+  useEffect(() => {
+    if (!onboardingActive || onboardingAutoOpened.current) return
+    onboardingAutoOpened.current = true
+    void openPanel()
+  }, [onboardingActive, openPanel])
 
   const sendText = useCallback(
     async (text: string) => {
@@ -212,7 +264,10 @@ export function WingmanChat({
       setBusy(true)
       try {
         const tid = await ensureThread()
-        const payload = JSON.stringify({ content: trimmed, coachingMode })
+        const payload = JSON.stringify({
+          content: trimmed,
+          coachingMode: effectiveCoachingMode,
+        })
 
         if (STREAMING_ENABLED) {
           const res = await authFetch(
@@ -307,7 +362,7 @@ export function WingmanChat({
         setBusy(false)
       }
     },
-    [authFetch, busy, coachingMode, ensureThread],
+    [authFetch, busy, effectiveCoachingMode, ensureThread],
   )
 
   const setMode = useCallback(
@@ -339,7 +394,9 @@ export function WingmanChat({
       if (block.type === 'cta') {
         if (block.action === 'open_record') {
           const focus =
-            block.payload?.focus === 'weight' || block.payload?.focus === 'activity'
+            block.payload?.focus === 'weight' ||
+            block.payload?.focus === 'activity' ||
+            block.payload?.focus === 'overview'
               ? block.payload.focus
               : undefined
           onOpenRecord(focus)
@@ -378,6 +435,7 @@ export function WingmanChat({
         }>(res)
         if (!res.ok) throw new Error('Could not complete action')
         onDataChanged()
+        onOnboardingRefresh?.()
         setMessages((prev) => [
           ...prev,
           {
@@ -393,14 +451,37 @@ export function WingmanChat({
         setBusy(false)
       }
     },
-    [authFetch, onDataChanged, onOpenInsights, onOpenNutrition, onOpenRecord],
+    [authFetch, onDataChanged, onOnboardingRefresh, onOpenInsights, onOpenNutrition, onOpenRecord],
   )
+
+  const skipSetup = useCallback(async () => {
+    setBusy(true)
+    try {
+      const res = await authFetch('/assistant/onboarding/skip', { method: 'POST' })
+      if (!res.ok) throw new Error('Could not skip setup')
+      onOnboardingRefresh?.()
+      onDataChanged()
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `local-a-${Date.now()}`,
+          role: 'assistant',
+          content:
+            'Setup skipped. Ask me anytime to set targets, meal times, or log weight and activities.',
+        },
+      ])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Skip failed')
+    } finally {
+      setBusy(false)
+    }
+  }, [authFetch, onDataChanged, onOnboardingRefresh])
 
   return (
     <>
       <button
         type="button"
-        className={`wingmanFab${showReminderDot ? ' hasReminder' : ''}`}
+        className={`wingmanFab${showReminderDot || onboardingActive ? ' hasReminder' : ''}`}
         aria-label={open ? 'Close wingman chat' : 'Open wingman chat'}
         title="Wellness wingman"
         onClick={() => (open ? setOpen(false) : void openPanel())}
@@ -412,26 +493,64 @@ export function WingmanChat({
         <div className="wingmanPanel" role="dialog" aria-label="Wellness wingman chat">
           <header className="wingmanHeader">
             <div>
-              <h2>Wingman</h2>
-              <p>Log weight & activities · gentle reminders</p>
-              <div className="wingmanModeRow" role="group" aria-label="Coaching mode">
-                {(['balanced', 'nutrition', 'wellness'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`wingmanModeBtn${coachingMode === mode ? ' active' : ''}`}
-                    disabled={busy}
-                    onClick={() => void setMode(mode)}
-                  >
-                    {mode === 'balanced' ? 'Balanced' : mode === 'nutrition' ? 'Nutrition' : 'Wellness'}
-                  </button>
-                ))}
-              </div>
+              <h2>{onboardingActive ? 'Setup with Wingman' : 'Wingman'}</h2>
+              <p>
+                {onboardingActive && onboarding
+                  ? `Step ${Math.min(onboarding.steps.length, onboarding.steps.findIndex((s) => s.id === onboarding.step) + 1 || 1)} of ${onboarding.steps.length} · answer in chat or tap confirm`
+                  : 'Log weight & activities · gentle reminders'}
+              </p>
+              {onboardingActive && onboarding ? (
+                <div
+                  className="wingmanOnboardingProgress"
+                  role="progressbar"
+                  aria-valuenow={onboarding.percentComplete}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  {onboarding.steps.map((s) => (
+                    <span
+                      key={s.id}
+                      className={`wingmanOnboardingStep${s.done ? ' done' : s.id === onboarding.step ? ' current' : ''}`}
+                    >
+                      {s.label}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="wingmanModeRow" role="group" aria-label="Coaching mode">
+                  {(['balanced', 'nutrition', 'wellness'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`wingmanModeBtn${coachingMode === mode ? ' active' : ''}`}
+                      disabled={busy}
+                      onClick={() => void setMode(mode)}
+                    >
+                      {mode === 'balanced'
+                        ? 'Balanced'
+                        : mode === 'nutrition'
+                          ? 'Nutrition'
+                          : 'Wellness'}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="wingmanHeaderActions">
+              {onboardingActive ? (
+                <button
+                  type="button"
+                  className="secondary wingmanSkipSetup"
+                  disabled={busy}
+                  onClick={() => void skipSetup()}
+                >
+                  Skip setup
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={`wingmanMemoryBtn${showMemory ? ' active' : ''}`}
+                hidden={onboardingActive}
                 aria-expanded={showMemory}
                 disabled={busy}
                 onClick={() => {
@@ -486,7 +605,10 @@ export function WingmanChat({
           {error ? <p className="wingmanErr">{error}</p> : null}
 
           <div className="wingmanStarters">
-            {WINGMAN_STARTER_PROMPTS[coachingMode].map((prompt) => (
+            {!onboardingActive &&
+              WINGMAN_STARTER_PROMPTS[
+                coachingMode === 'onboarding' ? 'balanced' : coachingMode
+              ].map((prompt) => (
               <button
                 key={prompt}
                 type="button"

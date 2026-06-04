@@ -21,13 +21,16 @@ import {
 } from './weekly-meal-plan-format.util';
 import { buildWingmanSystemPrompt } from './prompts/system-prompt';
 import {
+  parseGenerateMealPlanIntent,
   parseLogActivityIntent,
   parseLogWeightIntent,
+  parseMarkMealEatenIntent,
   parseRegenerateMealIntent,
   parseShoppingListIntent,
 } from './wingman-intent';
 import type { WingmanCoachingMode } from './prompts/coaching-mode';
 import type { AssistantUiBlock } from './assistant-ui.types';
+import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
 
 const MEDICAL_URGENT =
   /chest\s+pain|heart\s+attack|stroke|can't\s+breathe|cannot\s+breathe|severe\s+pain|fainting|passed\s+out/i;
@@ -40,6 +43,7 @@ export class AssistantWingmanService {
     private readonly tools: AssistantToolsService,
     private readonly llm: WingmanLlmFacade,
     private readonly userMemory: UserMemoryService,
+    private readonly onboarding: WingmanOnboardingService,
   ) {}
 
   llmAvailable(): boolean {
@@ -63,8 +67,22 @@ export class AssistantWingmanService {
       resultSummary: string;
     }>;
   }> {
-    const staticReply = await this.tryStaticReply(userId, userMessage);
-    if (staticReply) return staticReply;
+    const obStatus = await this.onboarding.getStatus(userId);
+
+    if (MEDICAL_URGENT.test(userMessage)) {
+      return {
+        content:
+          'Chest pain or serious symptoms during exercise need urgent medical attention. Please contact emergency services or your doctor now. I cannot diagnose or treat medical conditions.',
+      };
+    }
+
+    if (obStatus.active) {
+      const obReply = await this.onboarding.handleMessage(userId, userMessage);
+      if (obReply) return obReply;
+    } else {
+      const staticReply = await this.tryStaticReply(userId, userMessage);
+      if (staticReply) return staticReply;
+    }
 
     if (!this.llmAvailable()) {
       return {
@@ -73,7 +91,7 @@ export class AssistantWingmanService {
       };
     }
 
-    const ctx = await this.buildLlmContext(userId, threadId);
+    const ctx = await this.buildLlmContext(userId, threadId, obStatus);
 
     const traceResults: Array<{
       name: string;
@@ -116,14 +134,37 @@ export class AssistantWingmanService {
     threadId: string,
     userMessage: string,
   ): AsyncGenerator<WingmanStreamEvent> {
-    const staticReply = await this.tryStaticReply(userId, userMessage);
-    if (staticReply) {
+    const obStatus = await this.onboarding.getStatus(userId);
+
+    if (MEDICAL_URGENT.test(userMessage)) {
       yield {
         type: 'done',
-        content: staticReply.content,
-        uiBlocks: staticReply.uiBlocks,
+        content:
+          'Chest pain or serious symptoms during exercise need urgent medical attention. Please contact emergency services or your doctor now. I cannot diagnose or treat medical conditions.',
       };
       return;
+    }
+
+    if (obStatus.active) {
+      const obReply = await this.onboarding.handleMessage(userId, userMessage);
+      if (obReply) {
+        yield {
+          type: 'done',
+          content: obReply.content,
+          uiBlocks: obReply.uiBlocks,
+        };
+        return;
+      }
+    } else {
+      const staticReply = await this.tryStaticReply(userId, userMessage);
+      if (staticReply) {
+        yield {
+          type: 'done',
+          content: staticReply.content,
+          uiBlocks: staticReply.uiBlocks,
+        };
+        return;
+      }
     }
 
     if (!this.llmAvailable()) {
@@ -135,7 +176,7 @@ export class AssistantWingmanService {
       return;
     }
 
-    const ctx = await this.buildLlmContext(userId, threadId);
+    const ctx = await this.buildLlmContext(userId, threadId, obStatus);
     const traceResults: Array<{
       name: string;
       args: Record<string, unknown>;
@@ -248,7 +289,11 @@ export class AssistantWingmanService {
     };
   }
 
-  private async buildLlmContext(userId: string, threadId: string) {
+  private async buildLlmContext(
+    userId: string,
+    threadId: string,
+    obStatus?: Awaited<ReturnType<WingmanOnboardingService['getStatus']>>,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { displayName: true },
@@ -262,13 +307,19 @@ export class AssistantWingmanService {
       this.config.get<string>('ASSISTANT_RESPONSE_MODE') === 'detailed'
         ? 'detailed'
         : 'concise';
-    const coachingMode = this.normalizeCoachingMode(threadRow?.coachingMode);
+    let coachingMode = this.normalizeCoachingMode(threadRow?.coachingMode);
+    if (obStatus?.active) {
+      coachingMode = 'onboarding';
+    }
 
     let system = buildWingmanSystemPrompt({
       displayName: user?.displayName ?? null,
       responseMode: mode,
       coachingMode,
     });
+    if (obStatus?.active) {
+      system += this.onboarding.formatOnboardingContext(obStatus.step);
+    }
     if (threadRow?.summary?.trim()) {
       system += `\n\n## Thread memory (this conversation)\n${threadRow.summary.trim()}`;
     }
@@ -304,6 +355,70 @@ export class AssistantWingmanService {
       return {
         content:
           'Chest pain or serious symptoms during exercise need urgent medical attention. Please contact emergency services or your doctor now. I cannot diagnose or treat medical conditions.',
+      };
+    }
+
+    const markEaten = parseMarkMealEatenIntent(userMessage);
+    if (markEaten) {
+      const today = new Date().toISOString().slice(0, 10);
+      const plan = (await this.tools.execute(userId, 'get_meal_plan', {
+        date: today,
+      })) as {
+        error?: string;
+        versionId?: string;
+        meals?: Array<{
+          id: string;
+          mealType: string;
+          title: string;
+        }>;
+      };
+      if (plan.error || !plan.versionId) {
+        return {
+          content:
+            'Create a meal plan in the Nutrition tab first, then I can mark meals as eaten.',
+          uiBlocks: [
+            { type: 'cta', label: 'Open Nutrition tab', action: 'open_nutrition' },
+          ],
+        };
+      }
+      const meal = plan.meals?.find((m) => m.mealType === markEaten.mealType);
+      if (!meal) {
+        return {
+          content: `I don't see ${markEaten.mealTypeLabel.toLowerCase()} on today's plan.`,
+        };
+      }
+      return {
+        content: `I can mark **${markEaten.mealTypeLabel}** (${meal.title}) as eaten. Confirm to add it to today's intake.`,
+        uiBlocks: [
+          {
+            type: 'cta',
+            label: `Confirm: Mark ${markEaten.mealTypeLabel} eaten`,
+            action: 'confirm_mark_meal_eaten',
+            payload: {
+              versionId: plan.versionId,
+              mealId: meal.id,
+              mealTitle: meal.title,
+            },
+          },
+        ],
+      };
+    }
+
+    const generatePlan = parseGenerateMealPlanIntent(userMessage);
+    if (generatePlan) {
+      return {
+        content: `I can generate a **${generatePlan.duration}** meal plan starting ${generatePlan.startDate}. Confirm to create it (this may take a moment).`,
+        uiBlocks: [
+          {
+            type: 'cta',
+            label: `Confirm: Generate ${generatePlan.duration} plan`,
+            action: 'confirm_generate_meal_plan',
+            payload: {
+              startDate: generatePlan.startDate,
+              duration: generatePlan.duration,
+            },
+          },
+        ],
       };
     }
 
@@ -624,7 +739,13 @@ export class AssistantWingmanService {
   private normalizeCoachingMode(
     value: string | null | undefined,
   ): WingmanCoachingMode {
-    if (value === 'nutrition' || value === 'wellness') return value;
+    if (
+      value === 'nutrition' ||
+      value === 'wellness' ||
+      value === 'onboarding'
+    ) {
+      return value;
+    }
     return 'balanced';
   }
 }

@@ -10,7 +10,7 @@ After sign-in, open **Overview**. At the top:
 |------|---------|
 | **Today** | Calories left, protein ring, next planned meal, activity this week, reminders, 7-day adherence, streaks |
 | **Quick food log** | Log food outside the meal plan (recipe search or single ingredient) |
-| **Daily check-in** | Sleep, water, mood; optional demo wearable import |
+| **Daily check-in** | Sleep, water, mood; optional demo wearable import; **7-day average feeds ~12.5% of wellness score** |
 
 Data loads via `GET /api/today` together with existing overview charts (`loadTrends` in the web app).
 
@@ -19,7 +19,7 @@ Data loads via `GET /api/today` together with existing overview charts (`loadTre
 | Method | Path | Body / query | Notes |
 |--------|------|--------------|--------|
 | `GET` | `/today` | `?date=YYYY-MM-DD` (optional) | Aggregated today summary |
-| `PUT` | `/daily-check-in` | `date`, `sleepHours`, `waterGlasses`, `mood` (1–5) | Upsert habits for a day |
+| `PUT` | `/daily-check-in` | `date`, `sleepHours`, `waterGlasses`, `mood` (1–5), optional `steps` | Upsert habits for a day |
 | `GET` | `/daily-check-in` | `?date=` | Read check-in for a day |
 | `POST` | `/daily-check-in/wearable-demo` | `date`, `steps`, `sleepHours` | Demo Apple Health / Google Fit import (`source: wearable_demo`) |
 | `POST` | `/food-log/quick` | See below | Creates `MealIntakeLog` with `source: manual` |
@@ -29,6 +29,8 @@ Data loads via `GET /api/today` together with existing overview charts (`loadTre
 
 - `nutrition` — same shape as `nutrition-analytics/daily` plus `caloriesRemaining`
 - `checkIn` — today's `DailyCheckIn` or `null`
+- `checkInDayScore` — 0–100 for today from sleep/water/mood logged
+- `checkInWeekScore` — 7-day check-in habits average (used in wellness score when present)
 - `nextMeal` — next uneaten slot from active meal plan (if any)
 - `reminders` — `weightDue`, `activityDue` (7-day weight / cadence-based activity)
 - `activityWeek` — active days this week vs `weeklyActivityDays` from health profile
@@ -76,8 +78,8 @@ Migration: `20260603120000_daily_wellness`.
 1. Sign in (`demo@numbers.local` after `pnpm demo:seed`).
 2. **Overview** → confirm **Today** shows calories left and protein %.
 3. **Quick food log** → search a recipe → **Log food** → Today calories update after refresh.
-4. **Daily check-in** → save sleep/water/mood.
-5. Expand **Import demo wearable data** → import steps/sleep → steps appear on check-in.
+4. **Daily check-in** → save sleep/water/mood (optional steps) → wellness gauge **Check-in (7d)** bar and Today card update; steps show on Today when set.
+5. Expand **Import demo wearable data** → import steps/sleep → steps pre-fill the form (demo source).
 6. **Nutrition** → generate meal plan → return to Overview → **Next meal** populated.
 7. Mark meals eaten on meal plan → adherence % and logging streak increase.
 

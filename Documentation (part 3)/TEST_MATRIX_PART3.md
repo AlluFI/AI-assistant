@@ -79,9 +79,9 @@ Prereq: signed in, `ASSISTANT_ENABLED` not `false`, migrations applied, LLM key 
 | 3 | Reminder dot | Shows when weight/activity due (same rules as Overview banners) |
 | 4 | Send `What's my current BMI?` | Answer uses plausible data from demo profile |
 | 5 | Send `record 1 hour tennis for today` | Confirm CTA; no DB write until confirm |
-| 6 | Tap Confirm | Success message; activity in Record tab |
+| 6 | Tap Confirm | Success message; activity in Weight & activity tab |
 | 7 | Send `record weight 75 kg` | Confirm CTA → metric saved |
-| 8 | Tap "Open Record tab" | Navigates to Record view |
+| 8 | Tap "Open Weight & activity tab" | Navigates to Weight & activity view |
 | 9 | Empty send | No crash; button disabled or API 400 |
 | 10 | Close panel, reopen | Same thread; messages reload from API |
 | 11 | Enable streaming (`VITE_ASSISTANT_STREAMING=true` build) | Tokens appear incrementally |
@@ -112,7 +112,7 @@ Test each; mark pass when answer uses **real data** (not invented numbers).
 
 | Step | Check |
 |------|--------|
-| 1 | Log weight in Record tab → ask wingman about weight → matches |
+| 1 | Log weight in Weight & activity tab → ask wingman about weight → matches |
 | 2 | Generate meal plan in Nutrition → ask "meal plan today" → matches |
 | 3 | Overview charts trend → ask "describe my weight trend" → aligns with chart |
 | 4 | Confirm meal photo intake → daily nutrition totals update |
