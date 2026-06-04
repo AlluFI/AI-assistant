@@ -8,6 +8,10 @@ import { ProgressChartsPanel } from './ProgressChartsPanel'
 import { WellnessGauge } from './WellnessGauge'
 import { NutritionDailyCompact } from '../nutrition/NutritionDailyCompact'
 import type { DailyAnalytics, TrendPoint, WeeklyAnalytics } from '../nutrition/types'
+import { DailyCheckInPanel } from './DailyCheckInPanel'
+import { QuickFoodLogPanel } from './QuickFoodLogPanel'
+import { TodayDashboard } from './TodayDashboard'
+import type { TodaySummary } from './todayTypes'
 import type { SummaryComponents } from './dashboardUtils'
 import { weightProgressPct } from './dashboardUtils'
 
@@ -55,6 +59,13 @@ export type HealthOverviewProps = {
   nutritionTrend?: TrendPoint[]
   nutritionWeekly?: WeeklyAnalytics | null
   nutritionInsightPreview?: string | null
+  todaySummary?: TodaySummary | null
+  accessToken?: string
+  onRefreshToday?: () => void
+  onLogWeight?: () => void
+  onLogActivity?: () => void
+  setMessage?: (v: string) => void
+  setError?: (v: string) => void
 }
 
 export function HealthOverview({
@@ -78,6 +89,13 @@ export function HealthOverview({
   nutritionTrend = [],
   nutritionWeekly = null,
   nutritionInsightPreview = null,
+  todaySummary = null,
+  accessToken = '',
+  onRefreshToday,
+  onLogWeight,
+  onLogActivity,
+  setMessage = () => {},
+  setError = () => {},
 }: HealthOverviewProps) {
   const startingWeight =
     (weightSeries.find((p) => p.isBaseline) ?? weightSeries[0])?.weightKg ?? null
@@ -107,11 +125,42 @@ export function HealthOverview({
       ? Math.min(100, Math.round((latestActivityDays / desiredActivityTargetDays) * 100))
       : null
 
+  const todayDate = todaySummary?.date ?? new Date().toISOString().slice(0, 10)
+
   return (
     <div className="dashboardGrid healthOverview">
       {quickActions ?? null}
 
       {loadError ? <p className="err vizError">{loadError}</p> : null}
+
+      <TodayDashboard
+        today={todaySummary}
+        busy={busy}
+        onLogWeight={onLogWeight}
+        onLogActivity={onLogActivity}
+        onViewNutrition={onViewNutrition}
+      />
+
+      {accessToken ? (
+        <>
+          <QuickFoodLogPanel
+            accessToken={accessToken}
+            busy={busy}
+            onLogged={() => onRefreshToday?.()}
+            setMessage={setMessage}
+            setError={setError}
+          />
+          <DailyCheckInPanel
+            accessToken={accessToken}
+            date={todayDate}
+            checkIn={todaySummary?.checkIn ?? null}
+            busy={busy}
+            onSaved={() => onRefreshToday?.()}
+            setMessage={setMessage}
+            setError={setError}
+          />
+        </>
+      ) : null}
 
       <section className="card cardSpan2 healthDashboard">
         <h2>Health dashboard</h2>

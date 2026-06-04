@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { HealthOverview } from './dashboard/HealthOverview'
+import type { TodaySummary } from './dashboard/todayTypes'
 import {
   RecordMetricsPanel,
   type ActivityEntry,
@@ -99,6 +100,7 @@ export default function App() {
   const [chartDays, setChartDays] = useState(90)
   const [nutritionTrend, setNutritionTrend] = useState<TrendPoint[]>([])
   const [nutritionDaily, setNutritionDaily] = useState<DailyAnalytics | null>(null)
+  const [todaySummary, setTodaySummary] = useState<TodaySummary | null>(null)
   const [nutritionWeekly, setNutritionWeekly] = useState<WeeklyAnalytics | null>(null)
   const [nutritionInsights, setNutritionInsights] = useState<NutritionInsights | null>(null)
   const [nutritionInsightsLoading, setNutritionInsightsLoading] = useState(false)
@@ -249,13 +251,14 @@ export default function App() {
       setBusy(true)
       setError(null)
       try {
-        const [w, ws, act, nut, daily, weekly] = await Promise.all([
+        const [w, ws, act, nut, daily, weekly, today] = await Promise.all([
           authApi.request<Point[]>(`/analytics/series/weight?days=${days}`),
           authApi.request<Point[]>(`/analytics/series/wellness?days=${days}`),
           authApi.request<unknown[]>(`/analytics/series/activity?days=${days}`),
           authApi.request<TrendPoint[]>(`/nutrition-analytics/trend?days=${days}`),
           authApi.request<DailyAnalytics>(`/nutrition-analytics/daily?date=${today}`),
           authApi.request<WeeklyAnalytics>(`/nutrition-analytics/weekly?end=${today}`),
+          authApi.request<TodaySummary>(`/today?date=${today}`),
         ])
         if (loadId !== trendsLoadSeq.current) return
         if (!w.response.ok) {
@@ -278,6 +281,7 @@ export default function App() {
         }
         if (daily.response.ok) setNutritionDaily(daily.data)
         if (weekly.response.ok) setNutritionWeekly(weekly.data)
+        if (today.response.ok) setTodaySummary(today.data)
       } finally {
         if (loadId === trendsLoadSeq.current) setBusy(false)
       }
@@ -1482,6 +1486,13 @@ export default function App() {
                 }
                 onViewInsights={() => setDashboardView('insights')}
                 onViewNutrition={() => setDashboardView('nutrition')}
+                todaySummary={todaySummary}
+                accessToken={accessToken ?? ''}
+                onRefreshToday={() => void loadTrends(chartDays)}
+                onLogWeight={() => setDashboardView('record')}
+                onLogActivity={() => setDashboardView('record')}
+                setMessage={setMessage}
+                setError={setError}
                 quickActions={
                   devToolsEnabled ? (
                   <section className="card cardSpan2">

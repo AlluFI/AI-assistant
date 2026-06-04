@@ -63,6 +63,9 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 | `get_nutrition_summary` | nutrition-analytics | “Calories today vs target?” |
 | `search_recipes` | recipes + RAG | “High protein lunch ideas” |
 | `get_chart_data` | analytics | “Show my weight trend” → `ui_blocks` chart |
+| `update_nutrition_targets` | nutrition | Set calorie/macro targets (AI, formula, or manual) |
+
+**Daily wellness (Overview):** `GET /today`, habits check-in, quick food log — see [DAILY_WELLNESS.md](./DAILY_WELLNESS.md).
 
 **Meal photos (bonus):** Gemini vision → `MealPhotoScan` → user confirm → `MealIntakeLog` → analytics ([MEAL_PHOTOS.md](./MEAL_PHOTOS.md)).
 

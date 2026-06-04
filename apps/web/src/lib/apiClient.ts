@@ -83,6 +83,19 @@ export async function apiPatch<T>(
   return data
 }
 
+export async function apiPut<T>(
+  path: string,
+  accessToken: string,
+  body?: unknown,
+): Promise<T> {
+  const { data } = await apiRequest<T>(path, {
+    accessToken,
+    method: 'PUT',
+    body,
+  })
+  return data
+}
+
 export async function apiDelete<T>(path: string, accessToken: string): Promise<T> {
   const { data } = await apiRequest<T>(path, {
     accessToken,

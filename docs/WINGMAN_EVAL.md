@@ -16,7 +16,7 @@ cd apps/api && pnpm test -- wingman.eval.spec
 
 ## Golden cases
 
-Defined in `apps/api/src/assistant/eval/wingman-golden-set.json` (14 cases covering health, nutrition, charts, recipe search, and confirm flows).
+Defined in `apps/api/src/assistant/eval/wingman-golden-set.json` (18 cases covering health, nutrition, charts, recipe search, nutrition target updates, and confirm flows).
 
 Heuristics live in `tool-routing.heuristic.ts` — they approximate routing for CI; live LLM tool choice may differ slightly.
 

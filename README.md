@@ -92,9 +92,10 @@ Compose sets `OAUTH_CALLBACK_BASE` to `http://localhost:3000/api/auth` so Google
 - **Nutrition analytics**: `GET /api/nutrition-analytics/daily`, `trend`, `weekly`, and AI summaries/suggestions via `GET /api/nutrition-analytics/insights`; meal-photo intake included in daily totals
 - **Enhanced nutrition**: micronutrient tracking panels, macro targets DTO, community recipe ratings (`recipe-feedback` module)
 - **Automation**: scheduled insight generation and weight/activity reminders (email or in-app) driven by privacy settings; hourly cron in API
-- **Web**: **Nutrition** tab — charts, AI nutrition analysis card, meal plan detail with per-meal macro pies, drag-to-reorder, manual meal add, **Confirm recipes**, **Create shopping list** / **Create list for meal**, **View recipe** modal with servings scale; **Search recipes** popup; **View shopping lists** with quantity editing and PDF download; **Log meal from photo** (Gemini); caloric trend on Overview → Progress
+- **Daily wellness**: `GET /api/today` (calories left, protein ring, next meal, reminders, adherence, streaks); `PUT /api/daily-check-in` (sleep, water, mood); `POST /api/daily-check-in/wearable-demo` (demo steps/sleep import); `POST /api/food-log/quick` (recipe or ingredient log → `MealIntakeLog`) — see [docs/DAILY_WELLNESS.md](docs/DAILY_WELLNESS.md)
+- **Web**: **Overview → Today** dashboard with quick food log, daily check-in, and wearable demo import; **Nutrition** tab — charts, AI nutrition analysis card, meal plan detail with per-meal macro pies, drag-to-reorder, manual meal add, **Confirm recipes**, **Create shopping list** / **Create list for meal**, **View recipe** modal with servings scale; **Search recipes** popup; **View shopping lists** with quantity editing and PDF download; **Log meal from photo** (Gemini); caloric trend on Overview → Progress
 - **Web profile UX**: privacy controls, reminder channel/cadence, and timezone editing under the **Profile** section; Insights tab sets automated insight cadence; fixed top toast notifications for success/error feedback
-- **Part 3 — Wingman**: floating chat (`WingmanChat`), thread history, SSE streaming, coaching modes (balanced / nutrition / wellness), 8 read tools + confirmed writes (log weight/activity, regenerate meal, shopping list), in-chat charts (line/bar/pie), proactive nudges, cross-session memory panel; API under `/api/assistant/*` — see [Phase 3 (AI wingman)](#phase-3-ai-wingman)
+- **Part 3 — Wingman**: floating chat (`WingmanChat`), thread history, SSE streaming, coaching modes (balanced / nutrition / wellness), 9 tools (incl. `update_nutrition_targets`) + confirmed writes (log weight/activity, regenerate meal, shopping list), in-chat charts (line/bar/pie), proactive nudges, cross-session memory panel; API under `/api/assistant/*` — see [Phase 3 (AI wingman)](#phase-3-ai-wingman)
 
 ## Scripts
 
@@ -106,7 +107,7 @@ Compose sets `OAUTH_CALLBACK_BASE` to `http://localhost:3000/api/auth` so Google
 | `pnpm demo:seed` | Demo account + 90-day metrics — see [Demo data](#demo-data) |
 | `pnpm nutrition:seed` | 500+ ingredients and recipes — see [Demo data](#demo-data) |
 | `pnpm phase3:bootstrap` | Phase 3 env + optional live bootstrap endpoint |
-| `pnpm wingman:eval` | Offline wingman routing checks (14/14 expected) |
+| `pnpm wingman:eval` | Offline wingman routing checks (18/18 expected) |
 | `pnpm verify` | API build/lint/e2e + web build |
 | `pnpm compose:up` | `docker compose up --build` |
 | `pnpm compose:down` | Tear down stack and remove volumes |
@@ -240,7 +241,7 @@ Parts 1–2 use **OpenAI** (`OPENAI_API_KEY`). Part 3 wingman uses **Anthropic**
 
 ## Part 3 compliance
 
-Before review, walk through [Documentation (part 3)/REQUIREMENTS_QUICKCHECK.md](Documentation%20(part%203)/REQUIREMENTS_QUICKCHECK.md) and [Documentation (part 3)/IMPLEMENTATION_STATUS.md](Documentation%20(part%203)/IMPLEMENTATION_STATUS.md). For a Part 2–style mandatory criteria map, copy and maintain local `Documentation (part 3)/COMPLIANCE_REPORT.md` (gitignored). Offline: `pnpm wingman:eval` (14 routing checks).
+Before review, walk through [Documentation (part 3)/REQUIREMENTS_QUICKCHECK.md](Documentation%20(part%203)/REQUIREMENTS_QUICKCHECK.md) and [Documentation (part 3)/IMPLEMENTATION_STATUS.md](Documentation%20(part%203)/IMPLEMENTATION_STATUS.md). For a Part 2–style mandatory criteria map, copy and maintain local `Documentation (part 3)/COMPLIANCE_REPORT.md` (gitignored). Offline: `pnpm wingman:eval` (18 routing checks).
 
 ## Next steps (roadmap)
 

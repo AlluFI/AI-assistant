@@ -34,6 +34,7 @@ model User {
   nutritionDayLogs        NutritionDayLog[]
   mealPhotoScans          MealPhotoScan[]
   mealIntakeLogs          MealIntakeLog[]
+  dailyCheckIns           DailyCheckIn[]
   assistantThreads        AssistantThread[]
   assistantUserMemory     AssistantUserMemory?
   recipeFeedback          RecipeFeedback[]
@@ -485,7 +486,25 @@ model MealPhotoScan {
   @@index([userId, createdAt])
 }
 
-/// Confirmed intake from photo (or future manual entry) — summed in daily analytics.
+/// Optional daily habits (sleep, hydration, mood) and demo wearable steps.
+model DailyCheckIn {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         String
+  sleepHours   Float?
+  waterGlasses Int?
+  mood         Int?
+  steps        Int?
+  source       String   @default("user")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+/// Confirmed intake from photo (or manual quick log) — summed in daily analytics.
 model MealIntakeLog {
   id        String         @id @default(cuid())
   userId    String

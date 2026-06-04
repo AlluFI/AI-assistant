@@ -3,7 +3,7 @@
 **Audit date:** 2026-05-30  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
-**Offline check:** `pnpm wingman:eval` → **14/14** routing heuristics pass (does not replace live LLM demo).
+**Offline check:** `pnpm wingman:eval` → **18/18** routing heuristics pass (does not replace live LLM demo).
 
 Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not started
 
@@ -14,7 +14,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Category | Status |
 |----------|--------|
 | Mandatory — conversation layer | ✅ |
-| Mandatory — data access (≥4 tools, real APIs) | ✅ (8 read tools) |
+| Mandatory — data access (≥4 tools, real APIs) | ✅ (9 tools incl. `update_nutrition_targets`) |
 | Mandatory — system prompt & safety | ✅ |
 | Mandatory — documentation | ✅ |
 | Extra — Docker one-command | ✅ |

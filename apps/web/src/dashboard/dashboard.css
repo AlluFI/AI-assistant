@@ -766,3 +766,134 @@
 .nutritionStatusInline.status-surplus {
   color: #dc2626;
 }
+
+.todayDashboard .todayHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.todayGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+}
+
+.todayStat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  min-width: 0;
+}
+
+.todayStatPrimary {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.todayStatLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.todayStatValue {
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
+.todayStatValueSm {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.todayReminders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.todayStreaks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.streakBadge {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 18%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.macroRing {
+  --macro-pct: 0%;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--primary) 0 var(--macro-pct),
+    var(--border) var(--macro-pct) 100%
+  );
+  display: grid;
+  place-items: center;
+}
+
+.macroRingLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--bg-soft);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.quickFoodLog,
+.todayCheckIn {
+  min-width: 0;
+}
+
+.quickLogHits {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.quickLogHits li button {
+  width: 100%;
+  text-align: left;
+}
+
+.quickLogRecentTitle {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.wearableDemoDetails {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.wearableDemoDetails summary {
+  cursor: pointer;
+  font-weight: 600;
+}

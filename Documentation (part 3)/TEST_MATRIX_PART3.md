@@ -13,7 +13,7 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 | `GET` | `/api/health` | No | `{ status: "ok" }` |
 | `GET` | `/api/assistant/bootstrap` | No | Providers, DB tables, checklist |
 | — | `pnpm phase3:bootstrap` | — | Offline env check |
-| — | `pnpm wingman:eval` | — | 14 routing heuristics (offline) |
+| — | `pnpm wingman:eval` | — | 18 routing heuristics (offline) |
 
 ---
 

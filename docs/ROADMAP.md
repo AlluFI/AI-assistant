@@ -41,6 +41,15 @@
 - [x] Gemini meal photos (`apps/api/src/meal-photos`, `docs/MEAL_PHOTOS.md`)
 - [x] Requirements compliance doc (`Documentation (part 3)/IMPLEMENTATION_STATUS.md`)
 
+## Phase 6 — Daily wellness (shipped)
+
+- [x] `GET /api/today` — Today dashboard aggregate
+- [x] Daily check-in (sleep, water, mood) + demo wearable import
+- [x] Quick food log (`POST /api/food-log/quick`)
+- [x] Overview UI: Today, Quick food log, Daily check-in
+- [x] Adherence % and protein/logging streaks
+- [x] Docs: [DAILY_WELLNESS.md](./DAILY_WELLNESS.md), TEST_MATRIX updates
+
 ## Open questions
 
 1. ~~Separate deployable vs monorepo~~ → **monorepo** for review
@@ -51,6 +60,6 @@
 
 ## Success metrics
 
-- ≥95% tool calls return valid args on golden set — **14/14 offline** (`pnpm wingman:eval`)
+- ≥95% tool calls return valid args on golden set — **18/18 offline** (`pnpm wingman:eval`)
 - Zero hallucinated calorie numbers in eval (spot-check + meal-photo DB path)
 - p95 response &lt; 8s without streaming (tools + one LLM round) — verify in demo environment

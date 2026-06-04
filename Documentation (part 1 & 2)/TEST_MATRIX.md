@@ -110,7 +110,24 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 
 ---
 
-## 8) AI insights (UI: Overview)
+## 8) Daily wellness (UI: Overview — Today)
+
+**Companion:** [docs/DAILY_WELLNESS.md](../../docs/DAILY_WELLNESS.md)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| `GET` | `/api/today` | Calories left, protein %, next meal, reminders, adherence, streaks |
+| `PUT` | `/api/daily-check-in` | Sleep, water (glasses), mood (1–5) |
+| `GET` | `/api/daily-check-in?date=YYYY-MM-DD` | Read check-in |
+| `POST` | `/api/daily-check-in/wearable-demo` | Demo steps + sleep import |
+| `POST` | `/api/food-log/quick` | Recipe or ingredient → `MealIntakeLog` |
+| `GET` | `/api/food-log/recent?limit=8` | Recent intake logs |
+
+**UI smoke:** Overview → **Today** card → **Quick food log** → **Daily check-in** → optional wearable demo → switch to Record when reminders show.
+
+---
+
+## 9) AI insights (UI: Overview)
 
 | Method | Path | Notes |
 |--------|------|--------|
@@ -119,7 +136,7 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 
 ---
 
-## 9) Privacy, export, deletion (UI: Privacy / Account)
+## 10) Privacy, export, deletion (UI: Privacy / Account)
 
 | Method | Path | Notes |
 |--------|------|--------|
@@ -132,7 +149,7 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 
 ---
 
-## 10) Health check
+## 11) Health check
 
 | Method | Path | Notes |
 |--------|------|--------|

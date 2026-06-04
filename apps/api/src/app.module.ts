@@ -24,6 +24,7 @@ import { NutritionAnalyticsModule } from './nutrition-analytics/nutrition-analyt
 import { AiModule } from './ai/ai.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MealPhotosModule } from './meal-photos/meal-photos.module';
+import { DailyWellnessModule } from './daily-wellness/daily-wellness.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { MealPhotosModule } from './meal-photos/meal-photos.module';
     AiModule,
     AssistantModule,
     MealPhotosModule,
+    DailyWellnessModule,
     HealthModule,
   ],
   providers: [

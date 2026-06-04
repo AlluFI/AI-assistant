@@ -17,7 +17,7 @@ All Parts 1–3 live in **this repository**. The older [counting-calories](https
 - **API:** Full assistant routes (threads, messages, stream, nudges, confirm actions, memory)
 - **API:** Meal photo analyze + confirm (`POST /api/meal-photos/*`)
 - **Web:** `WingmanChat` FAB + chart `ui_blocks`; `MealPhotoLog` on Nutrition tab
-- **Eval:** `pnpm wingman:eval` (14/14 offline routing checks)
+- **Eval:** `pnpm wingman:eval` (18/18 offline routing checks)
 - **Design:** [ARCHITECTURE.md](./ARCHITECTURE.md), [API_SKETCH.md](./API_SKETCH.md), [ROADMAP.md](./ROADMAP.md), [STACK.md](./STACK.md)
 
 ## Check readiness

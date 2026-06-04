@@ -86,8 +86,9 @@ Quick manual verification matrix for review. Routes are under **`/api`**. Authen
 | Method | Path | Notes |
 |--------|------|--------|
 | `GET` | `/api/nutrition/profile` | Combined health + nutrition profile, suggested targets |
-| `PATCH` | `/api/nutrition/profile` | Cuisines, dislikes, calorie target, meals/snacks per day, macros, meal times |
-| `POST` | `/api/nutrition/profile/apply-suggested-targets` | BMI/activity-based targets |
+| `PATCH` | `/api/nutrition/profile` | Cuisines, dislikes, calorie target, meals/snacks per day, macros, meal times (`snack`, `snack_2`, …) |
+| `POST` | `/api/nutrition/profile/apply-suggested-targets` | Mifflin–St Jeor formula targets |
+| `POST` | `/api/nutrition/profile/apply-ai-targets` | AI targets from health profile (`OPENAI_API_KEY`) |
 
 ---
 
@@ -155,7 +156,23 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 
 ---
 
-## 12) Privacy, export, deletion
+## 12) Daily wellness (UI: Overview — Today)
+
+**Companion:** [docs/DAILY_WELLNESS.md](../../docs/DAILY_WELLNESS.md)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| `GET` | `/api/today` | Today dashboard aggregate |
+| `PUT` | `/api/daily-check-in` | Habits check-in |
+| `POST` | `/api/daily-check-in/wearable-demo` | Demo wearable sync |
+| `POST` | `/api/food-log/quick` | Quick log (recipe or ingredient) |
+| `GET` | `/api/food-log/recent` | Recent logs |
+
+Intake from quick log is included in `GET /api/nutrition-analytics/daily`.
+
+---
+
+## 13) Privacy, export, deletion
 
 | Method | Path | Notes |
 |--------|------|--------|
@@ -167,7 +184,7 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 
 ---
 
-## 13) Health check
+## 14) Health check
 
 | Method | Path | Notes |
 |--------|------|--------|

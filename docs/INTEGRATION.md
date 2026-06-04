@@ -14,6 +14,7 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 | `docs/ROADMAP.md` | Phase 3 delivery phases |
 | `docs/PHASE3_BOOTSTRAP.md` | Bootstrap checklist and readiness |
 | `docs/REVIEWER_SETUP.md` | Clone, Docker, demo user |
+| `docs/DAILY_WELLNESS.md` | Today dashboard, check-in, quick food log |
 
 ## Key modules
 
@@ -22,6 +23,7 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 | Wingman chat + tools | `apps/api/src/assistant/` | `apps/web/src/wingman/` |
 | Meal photo vision | `apps/api/src/meal-photos/` | `apps/web/src/nutrition/MealPhotoLog.tsx` |
 | Nutrition + meal plans | `apps/api/src/meal-plans/`, `nutrition/` | `apps/web/src/nutrition/` |
+| Daily wellness (Today) | `apps/api/src/daily-wellness/` | `apps/web/src/dashboard/TodayDashboard.tsx`, etc. |
 
 ## Relation to counting-calories
 

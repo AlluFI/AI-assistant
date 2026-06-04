@@ -11,7 +11,7 @@ Short live-demo script for reviewers. Pair with [TEST_MATRIX_PART3.md](./TEST_MA
    - Optional: `GEMINI_API_KEY` for meal photos
 4. Rebuild/restart API after env changes: `docker compose up -d --build api`
 5. Open http://localhost:8080 and http://localhost:3000/docs → tags **assistant**, **meal-photos**
-6. Optional offline: `pnpm wingman:eval` (14/14 routing checks)
+6. Optional offline: `pnpm wingman:eval` (18/18 routing checks)
 
 ## Demo script (~20 min)
 

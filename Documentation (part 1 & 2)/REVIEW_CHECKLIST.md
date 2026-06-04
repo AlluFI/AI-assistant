@@ -52,6 +52,12 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 | Deficit/surplus and trend visualization | Nutrition UI: progress bar status colors + line trend where positive=deficit, negative=surplus. |
 | AI nutrition summary + suggestions | `GET /api/nutrition-analytics/insights`; verify highlights, concerns, macro balance, and actionable suggestions. |
 | Cross-feature integration (dashboard/progress) | Verify nutrition trend appears in Overview progress section and nutrition actions update dashboard analytics. |
+| Today dashboard (calories left, next meal) | Overview → **Today** card; `GET /api/today`; calories remaining and next planned meal after generating a plan. |
+| Quick food log | Overview → **Quick food log**; `POST /api/food-log/quick`; daily intake updates in Today + nutrition analytics. |
+| Daily habits + wearable demo | Overview → **Daily check-in**; `PUT /api/daily-check-in`; optional `POST /api/daily-check-in/wearable-demo`. |
+| Adherence and streaks | After marking meals eaten, Today shows 7-day adherence % and protein/logging streaks. |
+| AI / formula nutrition targets | Nutrition tab → **AI recommend targets** / **Use formula targets**; Wingman `update_nutrition_targets` tool. |
+| Multi-snack meal times | Set `snacksPerDay` ≥ 2; save profile; verify `snack` + `snack_2` time fields in Nutrition preferences. |
 | BMI/activity-driven personalization | Use "apply suggested targets" and profile activity changes; confirm nutrition targets and planning behavior adapt. |
 | Prompt strategy + params | Review `SECURITY_AND_AI_DECISIONS.md` and code usage for few-shot, sequential prompts, temperature/top-p rationale. |
 | API error UX + recovery | Trigger invalid payloads/timeouts/missing AI key; verify user-facing messages and fallback responses remain graceful. |
@@ -109,7 +115,14 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 - Demonstrate deficit/surplus visualization
 - Show AI nutrition analysis card (highlights/concerns/suggestions)
 
-### 8) Final quality checks
+### 8) Overview — Today, quick log, habits
+
+- Open **Overview** → **Today** (calories left, protein ring, next meal)
+- **Quick food log** from a recipe; confirm intake on Today refreshes
+- **Daily check-in** (sleep, water, mood); optional **Import demo wearable data**
+- Mark meals eaten → adherence % and streaks update
+
+### 9) Final quality checks
 
 - Run `pnpm verify`
 - Explain prompt sequence, RAG pipeline, and function-calling path
