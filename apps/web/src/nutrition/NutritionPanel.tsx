@@ -31,6 +31,8 @@ type NutritionPanelProps = {
   setMessage: (v: string) => void
   setError: (v: string) => void
   onOpenWellnessInsights?: () => void
+  moderationInAdminTab?: boolean
+  onOpenAdmin?: () => void
 }
 
 type CombinedProfile = {
@@ -61,6 +63,8 @@ export function NutritionPanel({
   setMessage,
   setError,
   onOpenWellnessInsights,
+  moderationInAdminTab,
+  onOpenAdmin,
 }: NutritionPanelProps) {
   const [profile, setProfile] = useState<CombinedProfile | null>(null)
   const [cuisines, setCuisines] = useState('')
@@ -576,6 +580,8 @@ export function NutritionPanel({
         setBusy={setBusy}
         setMessage={setMessage}
         setError={setError}
+        moderationInAdminTab={moderationInAdminTab}
+        onOpenAdmin={onOpenAdmin}
       />
 
       <section className="card cardWide">

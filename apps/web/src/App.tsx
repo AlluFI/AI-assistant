@@ -20,6 +20,8 @@ import type {
 } from './nutrition/types'
 import { WingmanChat } from './wingman/WingmanChat'
 import type { WingmanOnboardingStatus } from './wingman/types'
+import { AdminPanel } from './admin/AdminPanel'
+import { apiGet } from './lib/apiClient'
 import './nutrition/nutrition.css'
 import { emptyProfileForm, profileFromApi, profileToPayload } from './profileFormModel'
 import {
@@ -190,10 +192,13 @@ export default function App() {
   } = useAuthPublicFlows({ setBusy, setError, setMessage })
 
   const [dashboardView, setDashboardView] = useState<
-    'overview' | 'record' | 'insights' | 'nutrition' | 'profile' | 'account'
-  >(
-    'overview',
-  )
+    'overview' | 'record' | 'insights' | 'nutrition' | 'profile' | 'account' | 'admin'
+  >('overview')
+  const [adminAccess, setAdminAccess] = useState({
+    showAdminTab: false,
+    isModerator: false,
+    isPurgeAdmin: false,
+  })
   const [logDays, setLogDays] = useState(90)
   const [metricEntries, setMetricEntries] = useState<MetricEntry[]>([])
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([])
@@ -254,6 +259,27 @@ export default function App() {
     if (res.response.ok) setWingmanOnboarding(res.data)
   }, [authApi])
 
+  const loadAdminStatus = useCallback(async () => {
+    if (!accessToken) {
+      setAdminAccess({ showAdminTab: false, isModerator: false, isPurgeAdmin: false })
+      return
+    }
+    try {
+      const body = await apiGet<{
+        showAdminTab?: boolean
+        isModerator?: boolean
+        isPurgeAdmin?: boolean
+      }>('/admin/status', accessToken)
+      setAdminAccess({
+        showAdminTab: Boolean(body.showAdminTab),
+        isModerator: Boolean(body.isModerator),
+        isPurgeAdmin: Boolean(body.isPurgeAdmin),
+      })
+    } catch {
+      setAdminAccess({ showAdminTab: false, isModerator: false, isPurgeAdmin: false })
+    }
+  }, [accessToken])
+
   const loadTrends = useCallback(
     async (days: number) => {
       const loadId = ++trendsLoadSeq.current
@@ -312,7 +338,8 @@ export default function App() {
   useEffect(() => {
     if (!accessToken || showConsentOnboarding) return
     void loadWingmanOnboarding()
-  }, [accessToken, showConsentOnboarding, loadWingmanOnboarding])
+    void loadAdminStatus()
+  }, [accessToken, showConsentOnboarding, loadWingmanOnboarding, loadAdminStatus])
 
   useEffect(() => {
     if (!accessToken || dashboardView !== 'overview') return
@@ -1339,6 +1366,7 @@ export default function App() {
   } | null
 
   return (
+    <>
     <div className="page">
       <header className="header">
         <h1>My Health App</h1>
@@ -1483,6 +1511,15 @@ export default function App() {
                 >
                   Profile
                 </button>
+                {adminAccess.showAdminTab ? (
+                  <button
+                    type="button"
+                    className={`secondary${dashboardView === 'admin' ? ' active' : ''}`}
+                    onClick={() => setDashboardView('admin')}
+                  >
+                    Admin
+                  </button>
+                ) : null}
               </div>
             </section>
 
@@ -1722,6 +1759,22 @@ export default function App() {
                 setMessage={setMessage}
                 setError={setError}
                 onOpenWellnessInsights={() => setDashboardView('insights')}
+                moderationInAdminTab={adminAccess.isModerator}
+                onOpenAdmin={
+                  adminAccess.showAdminTab ? () => setDashboardView('admin') : undefined
+                }
+              />
+            ) : null}
+
+            {dashboardView === 'admin' && accessToken && adminAccess.showAdminTab ? (
+              <AdminPanel
+                accessToken={accessToken}
+                isModerator={adminAccess.isModerator}
+                isPurgeAdmin={adminAccess.isPurgeAdmin}
+                busy={busy}
+                setBusy={setBusy}
+                setMessage={setMessage}
+                setError={setError}
               />
             ) : null}
 
@@ -2192,37 +2245,38 @@ export default function App() {
         ) : null}
 
       </main>
-
-      {accessToken && !showConsentOnboarding ? (
-        <WingmanChat
-          authFetch={authApi.fetch}
-          onboarding={wingmanOnboarding}
-          onOnboardingRefresh={() => {
-            void loadWingmanOnboarding()
-            void loadTrends(chartDays)
-          }}
-          showReminderDot={
-            (weightReminderEnabled && weightReminderDue) ||
-            (activityReminderCadence !== 'off' && activityReminderDue)
-          }
-          onOpenRecord={(focus) => {
-            setDashboardView(focus === 'overview' ? 'overview' : 'record')
-          }}
-          onOpenNutrition={() => {
-            setDashboardView('nutrition')
-          }}
-          onOpenInsights={() => {
-            setDashboardView('insights')
-          }}
-          onDataChanged={() => {
-            void refreshReminderStatus()
-            void loadWingmanOnboarding()
-            void loadSummary()
-            if (dashboardView === 'overview') void loadTrends(chartDays)
-            if (dashboardView === 'record') void loadRecordData(logDays)
-          }}
-        />
-      ) : null}
     </div>
+
+    {accessToken && !showConsentOnboarding ? (
+      <WingmanChat
+        authFetch={authApi.fetch}
+        onboarding={wingmanOnboarding}
+        onOnboardingRefresh={() => {
+          void loadWingmanOnboarding()
+          void loadTrends(chartDays)
+        }}
+        showReminderDot={
+          (weightReminderEnabled && weightReminderDue) ||
+          (activityReminderCadence !== 'off' && activityReminderDue)
+        }
+        onOpenRecord={(focus) => {
+          setDashboardView(focus === 'overview' ? 'overview' : 'record')
+        }}
+        onOpenNutrition={() => {
+          setDashboardView('nutrition')
+        }}
+        onOpenInsights={() => {
+          setDashboardView('insights')
+        }}
+        onDataChanged={() => {
+          void refreshReminderStatus()
+          void loadWingmanOnboarding()
+          void loadSummary()
+          if (dashboardView === 'overview') void loadTrends(chartDays)
+          if (dashboardView === 'record') void loadRecordData(logDays)
+        }}
+      />
+    ) : null}
+  </>
   )
 }

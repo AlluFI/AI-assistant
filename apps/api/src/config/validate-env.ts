@@ -158,6 +158,10 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   PURGE_ADMIN_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  PURGE_ADMIN_EMAILS?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

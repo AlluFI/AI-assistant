@@ -22,6 +22,8 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 | Method | Path | Body | Expected |
 |--------|------|------|----------|
 | `GET` | `/api/assistant/nudges` | — | `lines[]`, optional `uiBlocks`, `status` |
+| `GET` | `/api/assistant/onboarding` | — | `{ active, step, steps, percentComplete, opener }` for setup wizard |
+| `POST` | `/api/assistant/onboarding/skip` | — | Sets `wingmanOnboardingSkippedAt`; wizard inactive |
 | `POST` | `/api/assistant/threads` | `{ "title"?: string }` | `{ id, createdAt, … }` |
 | `GET` | `/api/assistant/threads` | — | List with `preview` |
 | `GET` | `/api/assistant/threads/:id` | — | Thread + `messages[]` |
@@ -85,6 +87,8 @@ Prereq: signed in, `ASSISTANT_ENABLED` not `false`, migrations applied, LLM key 
 | 9 | Empty send | No crash; button disabled or API 400 |
 | 10 | Close panel, reopen | Same thread; messages reload from API |
 | 11 | Enable streaming (`VITE_ASSISTANT_STREAMING=true` build) | Tokens appear incrementally |
+| 12 | Fresh account or reset onboarding flags | Wingman opens with setup progress; `GET /assistant/onboarding` shows `active: true` — see [docs/WINGMAN_ONBOARDING.md](../../docs/WINGMAN_ONBOARDING.md) |
+| 13 | Overview → Daily check-in → save steps | Today card shows step count; Wingman `get_daily_check_in` matches |
 
 ---
 

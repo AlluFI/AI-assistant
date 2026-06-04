@@ -1,6 +1,7 @@
 .page {
   max-width: 64rem;
   width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
   font-family: system-ui, sans-serif;
@@ -519,6 +520,101 @@ button.secondary.active,
   gap: 0.45rem;
 }
 
+.adminPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.adminSection {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.adminDeletionHint {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminDeletionHint code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.adminTableWrap {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-top: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.adminTable {
+  width: 100%;
+  min-width: 36rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.adminTable th,
+.adminTable td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.adminDeletionCards {
+  display: none;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.adminDeletionCard {
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  background: var(--bg-soft);
+}
+
+.adminDeletionCard + .adminDeletionCard {
+  margin-top: 0.65rem;
+}
+
+.adminDeletionCardEmail {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.adminDeletionCardMeta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem 0.5rem;
+  margin: 0;
+}
+
+.adminDeletionCardMeta > div {
+  min-width: 0;
+}
+
+.adminDeletionCardMeta dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.adminDeletionCardMeta dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+}
+
 @media (max-width: 640px) {
   .page {
     padding: 1rem 0.75rem 3rem;
@@ -531,6 +627,18 @@ button.secondary.active,
   .dashboardTabs button {
     padding: 0.35rem 0.65rem;
     font-size: 0.75rem;
+  }
+
+  .adminDeletionCards {
+    display: block;
+  }
+
+  .adminTableWrapDesktop {
+    display: none;
+  }
+
+  .adminDeletionCardMeta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

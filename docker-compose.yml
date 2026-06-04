@@ -76,6 +76,8 @@ services:
       AUTH_REFRESH_COOKIE_ONLY: "false"
       DELETE_RETENTION_DAYS: "30"
       PURGE_ADMIN_SECRET: ${PURGE_ADMIN_SECRET:-change_me_for_admin_purge}
+      PURGE_ADMIN_EMAILS: ${PURGE_ADMIN_EMAILS:-}
+      RECIPE_MODERATOR_EMAILS: ${RECIPE_MODERATOR_EMAILS:-demo@numbers.local}
       PORT: "3000"
     depends_on:
       postgres:

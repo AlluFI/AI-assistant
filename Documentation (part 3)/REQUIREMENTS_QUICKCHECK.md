@@ -2,7 +2,7 @@
 
 Fast pass/fail for reviewers and self-review before submission.  
 Mark `[x]` when **verified in your environment** (live demo or test).  
-**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for what is already built in the repo.
+**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for what is already built in the repo (11 wingman tools, onboarding wizard, check-in wellness component).
 
 **Detailed criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **API/UI steps:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md)
@@ -30,7 +30,7 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] Error handling methods
 - [ ] Function calling implementation details
 
-**Built in repo:** `docs/PROMPT_ENGINEERING.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/LONG_TERM_MEMORY.md`.
+**Built in repo:** `docs/PROMPT_ENGINEERING.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/LONG_TERM_MEMORY.md`, `docs/WINGMAN_ONBOARDING.md`, `docs/DAILY_WELLNESS.md`.
 
 ---
 
@@ -68,7 +68,7 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] Protein/calories vs target for week/day
 - [ ] Dietary restrictions respected in recommendations
 
-**Built in repo:** `get_meal_plan`, `get_recipe`, `get_nutrition_summary`, `search_recipes`.
+**Built in repo:** `get_meal_plan`, `get_recipe`, `get_nutrition_summary`, `search_recipes`, `get_daily_check_in` (sleep/water/mood/steps).
 
 ---
 
@@ -118,7 +118,7 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] ≥ 5 turns context with follow-ups
 - [ ] Student explains model + temperature / top-p
 
-**Built in repo:** 10 tools (incl. `update_nutrition_targets`, `update_nutrition_preferences`); `pnpm wingman:eval` 18/18; docs in `PROMPT_ENGINEERING.md`.
+**Built in repo:** 11 tools (incl. `get_daily_check_in`, `update_health_profile`, `update_nutrition_targets`, `update_nutrition_preferences`); `pnpm wingman:eval` 18/18; docs in `PROMPT_ENGINEERING.md`.
 
 ---
 

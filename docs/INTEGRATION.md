@@ -15,6 +15,8 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 | `docs/PHASE3_BOOTSTRAP.md` | Bootstrap checklist and readiness |
 | `docs/REVIEWER_SETUP.md` | Clone, Docker, demo user |
 | `docs/DAILY_WELLNESS.md` | Today dashboard, check-in, quick food log |
+| `docs/WINGMAN_ONBOARDING.md` | Wingman in-chat setup wizard |
+| `docs/ADMIN.md` | Admin tab (moderation, manual deletion purge) |
 
 ## Key modules
 

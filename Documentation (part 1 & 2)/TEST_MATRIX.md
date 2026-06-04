@@ -87,7 +87,7 @@ Activity logs feed `GET /api/analytics/series/activity` (active days per week). 
 ## 6) Weight & activity tab — UI smoke test (no extra API)
 
 1. Sign in (demo: `demo@numbers.local` / `DemoPassword123!` after `pnpm demo:seed`).
-2. Open dashboard → **Record** tab.
+2. Open dashboard → **Weight & activity** tab.
 3. Log weight with optional date → appears in history table.
 4. Log activity (type + duration + date) → appears under Activities filter.
 5. Change range (30 / 90 / 180 / 365 days) → table refreshes.
@@ -100,7 +100,7 @@ Activity logs feed `GET /api/analytics/series/activity` (active days per week). 
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `GET` | `/api/analytics/summary` | BMI, wellness score, components, goals |
+| `GET` | `/api/analytics/summary` | BMI, wellness score, components (incl. optional `checkIn` when 7-day habits exist), goals |
 | `GET` | `/api/analytics/series/weight?days=90` | Weight time series (`days` 7–365) |
 | `GET` | `/api/analytics/series/wellness?days=90` | Wellness (+ BMI in payload) |
 | `GET` | `/api/analytics/series/activity?days=90` | Active days per week (metrics + activity logs) |
@@ -117,13 +117,13 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 | Method | Path | Notes |
 |--------|------|--------|
 | `GET` | `/api/today` | Calories left, protein %, next meal, reminders, adherence, streaks |
-| `PUT` | `/api/daily-check-in` | Sleep, water (glasses), mood (1–5) |
+| `PUT` | `/api/daily-check-in` | Sleep, water (glasses), mood (1–5), optional `steps` |
 | `GET` | `/api/daily-check-in?date=YYYY-MM-DD` | Read check-in |
 | `POST` | `/api/daily-check-in/wearable-demo` | Demo steps + sleep import |
 | `POST` | `/api/food-log/quick` | Recipe or ingredient → `MealIntakeLog` |
 | `GET` | `/api/food-log/recent?limit=8` | Recent intake logs |
 
-**UI smoke:** Overview → **Today** card → **Quick food log** → **Daily check-in** → optional wearable demo → switch to Record when reminders show.
+**UI smoke:** Overview → **Today** card → **Quick food log** → **Daily check-in** (optional steps) → optional wearable demo → switch to **Weight & activity** when reminders show.
 
 ---
 
@@ -145,7 +145,12 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 | `GET` | `/api/profile/deletion-request` | Status |
 | `POST` | `/api/profile/deletion-request` | Schedule deletion |
 | `POST` | `/api/profile/deletion-request/cancel` | Cancel pending |
-| `POST` | `/api/profile/deletion-request/purge-due` | Admin: header `x-purge-secret` = `PURGE_ADMIN_SECRET` |
+| `POST` | `/api/profile/deletion-request/purge-due` | Ops: body `{ "secret": "<PURGE_ADMIN_SECRET>" }` (JWT required; not automated) |
+| `GET` | `/api/admin/status` | `{ showAdminTab, isModerator, isPurgeAdmin }` for signed-in user |
+| `GET` | `/api/admin/deletion-queue` | Pending deletions (purge admin email only) |
+| `POST` | `/api/admin/purge-due` | Purge accounts past retention (purge admin email only) |
+
+**UI smoke (Admin):** Sign in as email in `RECIPE_MODERATOR_EMAILS` and/or `PURGE_ADMIN_EMAILS` → **Admin** tab visible → moderation queue and/or deletion cards (mobile) + purge button. See [docs/ADMIN.md](../../docs/ADMIN.md).
 
 ---
 

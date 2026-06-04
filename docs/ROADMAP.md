@@ -44,11 +44,20 @@
 ## Phase 6 — Daily wellness (shipped)
 
 - [x] `GET /api/today` — Today dashboard aggregate
-- [x] Daily check-in (sleep, water, mood) + demo wearable import
+- [x] Daily check-in (sleep, water, mood, optional manual steps) + demo wearable import
+- [x] Check-in habits → wellness score **Check-in (7d)** component (~12.5% when 7-day data exists)
 - [x] Quick food log (`POST /api/food-log/quick`)
-- [x] Overview UI: Today, Quick food log, Daily check-in
+- [x] Overview UI: Today, Quick food log, Daily check-in, nutrition setup banner
 - [x] Adherence % and protein/logging streaks
 - [x] Docs: [DAILY_WELLNESS.md](./DAILY_WELLNESS.md), TEST_MATRIX updates
+
+## Phase 7 — Wingman onboarding & polish (shipped)
+
+- [x] In-chat setup wizard (`GET/POST /api/assistant/onboarding`) — [WINGMAN_ONBOARDING.md](./WINGMAN_ONBOARDING.md)
+- [x] `update_health_profile` tool; onboarding confirm CTAs
+- [x] `get_daily_check_in` tool; check-in nudges
+- [x] Meal plan `snack_2` / `preferred_meal_times`; nutrition target rationale in UI
+- [x] **Weight & activity** tab label (Record renamed)
 
 ## Open questions
 

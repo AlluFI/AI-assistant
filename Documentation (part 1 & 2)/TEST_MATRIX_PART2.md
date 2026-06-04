@@ -163,7 +163,7 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 | Method | Path | Notes |
 |--------|------|--------|
 | `GET` | `/api/today` | Today dashboard aggregate |
-| `PUT` | `/api/daily-check-in` | Habits check-in |
+| `PUT` | `/api/daily-check-in` | Sleep, water, mood; optional `steps` |
 | `POST` | `/api/daily-check-in/wearable-demo` | Demo wearable sync |
 | `POST` | `/api/food-log/quick` | Quick log (recipe or ingredient) |
 | `GET` | `/api/food-log/recent` | Recent logs |

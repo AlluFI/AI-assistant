@@ -63,14 +63,18 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 | `get_nutrition_summary` | nutrition-analytics | “Calories today vs target?” |
 | `search_recipes` | recipes + RAG | “High protein lunch ideas” |
 | `get_chart_data` | analytics | “Show my weight trend” → `ui_blocks` chart |
+| `get_daily_check_in` | daily-wellness | Sleep, water, mood, steps (day or week) |
 | `update_nutrition_targets` | nutrition | Set calorie/macro targets (AI, formula, or manual); returns `recommendationRationale` when applicable |
 | `update_nutrition_preferences` | nutrition | Meals/snacks per day and `preferred_meal_times` (incl. `snack_2`) |
+| `update_health_profile` | profile | Age, height, weight, activity, goals (e.g. onboarding) |
 
-**Daily wellness (Overview):** `GET /today`, habits check-in, quick food log — see [DAILY_WELLNESS.md](./DAILY_WELLNESS.md).
+**Daily wellness (Overview):** `GET /today`, habits check-in (`PUT` incl. optional steps), quick food log — see [DAILY_WELLNESS.md](./DAILY_WELLNESS.md). Seven-day check-in habits can add a **Check-in** wellness component (~12.5% when data exists).
 
 **Meal photos (bonus):** Gemini vision → `MealPhotoScan` → user confirm → `MealIntakeLog` → analytics ([MEAL_PHOTOS.md](./MEAL_PHOTOS.md)).
 
-Actions that **mutate** data (regenerate plan, log meal) require **explicit user confirmation** in UI, not silent tool execution.
+**Onboarding:** scripted setup in chat — [WINGMAN_ONBOARDING.md](./WINGMAN_ONBOARDING.md).
+
+**Confirmed writes (UI, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, and `confirm_onboarding_*` (see onboarding doc). Rule-parsed weight/activity and meal-plan actions still require explicit confirm before DB writes.
 
 ## Response shape
 

@@ -45,9 +45,9 @@ pnpm dev:web    # terminal 2 — http://localhost:5173
 
 | Part | Where to look |
 |------|----------------|
-| 1–2 | Overview (**Today**, quick food log, check-in), Profile, Insights, Nutrition tabs; `REVIEW_CHECKLIST.md`, `TEST_MATRIX.md`, `docs/DAILY_WELLNESS.md` |
+| 1–2 | Overview (**Today**, quick food log, check-in with optional steps), **Weight & activity**, Profile, Insights, Nutrition; optional **Admin** (`docs/ADMIN.md`); `REVIEW_CHECKLIST.md`, `TEST_MATRIX.md`, `docs/DAILY_WELLNESS.md` |
 | 3 bootstrap | `GET /api/assistant/bootstrap`, Swagger **assistant** tag; `docs/ARCHITECTURE.md` |
-| 3 wingman | Floating chat (💬), `apps/api/src/assistant/`, Swagger **assistant** tag |
+| 3 wingman | Floating chat (💬), setup wizard (`docs/WINGMAN_ONBOARDING.md`), 11 tools; `apps/api/src/assistant/`, Swagger **assistant** tag |
 
 ```bash
 pnpm phase3:bootstrap

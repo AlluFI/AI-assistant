@@ -1,6 +1,6 @@
 # Part 3 — Implementation status vs requirements
 
-**Audit date:** 2026-05-30  
+**Audit date:** 2026-05-28 (synced with Wingman onboarding + daily check-in wellness)  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
 **Offline check:** `pnpm wingman:eval` → **18/18** routing heuristics pass (does not replace live LLM demo).
@@ -14,7 +14,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Category | Status |
 |----------|--------|
 | Mandatory — conversation layer | ✅ |
-| Mandatory — data access (≥4 tools, real APIs) | ✅ (9 tools incl. `update_nutrition_targets`) |
+| Mandatory — data access (≥4 tools, real APIs) | ✅ (11 LLM tools + confirmed writes) |
 | Mandatory — system prompt & safety | ✅ |
 | Mandatory — documentation | ✅ |
 | Extra — Docker one-command | ✅ |
@@ -45,6 +45,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | BMI, weight, wellness, activity | ✅ | `get_health_metrics` → profile + analytics |
 | Goals and preferences | ✅ | `get_progress_summary`, profile snapshot in prompt |
 | Progress / activity history | ✅ | `get_progress_summary`, `get_chart_data` |
+| Sleep / hydration / mood habits | ✅ | `get_daily_check_in`; Overview `PUT /daily-check-in` |
 | Personalized insights (multi-data) | 🟡 | LLM synthesis over tools; verify in demo |
 
 ### Integration — nutrition
@@ -125,9 +126,13 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | `get_recipe` | ✅ | Recipes |
 | `get_nutrition_summary` | ✅ | Nutrition analytics |
 | `get_chart_data` | ✅ | Analytics series |
-| `search_recipes` | ✅ | Recipes + RAG (extra) |
+| `search_recipes` | ✅ | Recipes + RAG |
+| `get_daily_check_in` | ✅ | Daily wellness |
+| `update_health_profile` | ✅ | Profile |
+| `update_nutrition_targets` | ✅ | Nutrition targets |
+| `update_nutrition_preferences` | ✅ | Nutrition profile prefs |
 
-**Confirmed writes (UI only, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_create_shopping_list`.
+**Confirmed writes (UI only, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, `confirm_onboarding_skip`, `confirm_onboarding_ai_targets`, `confirm_onboarding_formula_targets`, `confirm_onboarding_meal_defaults` — see `docs/WINGMAN_ONBOARDING.md`.
 
 ### Memory & context
 
@@ -172,6 +177,8 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Weekly proactive nudge | ✅ | `GET /assistant/nudges` |
 | Eval harness | ✅ | `pnpm wingman:eval`, `docs/WINGMAN_EVAL.md` |
 | Cross-session memory | ✅ | `docs/LONG_TERM_MEMORY.md` |
+| Wingman onboarding wizard | ✅ | `docs/WINGMAN_ONBOARDING.md`, `GET/POST /assistant/onboarding` |
+| Daily check-in → wellness | ✅ | `check-in-wellness.util.ts`, Overview gauge **Check-in (7d)** |
 
 ---
 
@@ -185,7 +192,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Multi-turn + PII + medical | ✅ | Rules + prompt; demo chest pain / email |
 | History persist close/reopen | ✅ | Thread list reloads from API |
 | Input validation | ✅ | `@MaxLength(8000)`, `@IsNotEmpty` |
-| ≥4 tools, ≥5 turns | ✅ | 8 tools; 10-turn window |
+| ≥4 tools, ≥5 turns | ✅ | 11 tools; 10-turn window |
 | Jailbreak resistance | 🟡 | Prompt + auth scope; demo other-user prompts |
 | Student explains model choices | ✅ | Documented; prepare verbal summary |
 

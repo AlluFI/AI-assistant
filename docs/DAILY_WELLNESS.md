@@ -10,7 +10,7 @@ After sign-in, open **Overview**. At the top:
 |------|---------|
 | **Today** | Calories left, protein ring, next planned meal, activity this week, reminders, 7-day adherence, streaks |
 | **Quick food log** | Log food outside the meal plan (recipe search or single ingredient) |
-| **Daily check-in** | Sleep, water, mood; optional demo wearable import; **7-day average feeds ~12.5% of wellness score** |
+| **Daily check-in** | Sleep, water, mood, optional **steps** on main form; collapsible demo wearable import; **7-day habits average feeds ~12.5% of wellness score** (steps shown on Today only) |
 
 Data loads via `GET /api/today` together with existing overview charts (`loadTrends` in the web app).
 

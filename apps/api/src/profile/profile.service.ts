@@ -928,11 +928,38 @@ export class ProfileService {
     return { request: out };
   }
 
-  async purgeDue(secret: string) {
-    const expected = this.config.get<string>('PURGE_ADMIN_SECRET');
-    if (!expected || secret !== expected) {
-      throw new ForbiddenException('Invalid purge secret');
+  isPurgeAdmin(email: string): boolean {
+    const raw = this.config.get<string>('PURGE_ADMIN_EMAILS');
+    const list = (raw ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    return list.includes(email.trim().toLowerCase());
+  }
+
+  async listPendingDeletions(adminEmail: string) {
+    if (!this.isPurgeAdmin(adminEmail)) {
+      throw new ForbiddenException('Purge admin access required');
     }
+    const now = new Date();
+    const rows = await this.prisma.deletionRequest.findMany({
+      where: { status: 'pending' },
+      orderBy: { scheduledFor: 'asc' },
+      take: 100,
+      include: { user: { select: { email: true } } },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      userEmail: r.user.email,
+      reason: r.reason,
+      requestedAt: r.requestedAt.toISOString(),
+      scheduledFor: r.scheduledFor.toISOString(),
+      isDue: r.scheduledFor <= now,
+    }));
+  }
+
+  async purgeDueUsers(): Promise<{ purged: number }> {
     const due = await this.prisma.deletionRequest.findMany({
       where: {
         status: 'pending',
@@ -946,5 +973,20 @@ export class ProfileService {
       purged += 1;
     }
     return { purged };
+  }
+
+  async purgeDue(secret: string) {
+    const expected = this.config.get<string>('PURGE_ADMIN_SECRET');
+    if (!expected || secret !== expected) {
+      throw new ForbiddenException('Invalid purge secret');
+    }
+    return this.purgeDueUsers();
+  }
+
+  async purgeDueAsAdmin(adminEmail: string) {
+    if (!this.isPurgeAdmin(adminEmail)) {
+      throw new ForbiddenException('Purge admin access required');
+    }
+    return this.purgeDueUsers();
   }
 }

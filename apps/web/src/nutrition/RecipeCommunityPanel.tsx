@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiGet, apiPatch } from '../lib/apiClient'
-
-type PendingRow = {
-  id: string
-  recipeId: string
-  rating: number
-  reviewText: string | null
-  recipeTitle: string
-  authorEmail: string
-}
+import { apiGet } from '../lib/apiClient'
 
 type VerifiedRecipe = {
   id: string
@@ -25,17 +16,17 @@ type Props = {
   setBusy: (v: boolean) => void
   setMessage: (v: string) => void
   setError: (v: string) => void
+  /** When true, moderation queue lives on the Admin tab instead. */
+  moderationInAdminTab?: boolean
+  onOpenAdmin?: () => void
 }
 
 export function RecipeCommunityPanel({
   accessToken,
-  busy,
-  setBusy,
-  setMessage,
-  setError,
+  moderationInAdminTab,
+  onOpenAdmin,
 }: Props) {
   const [isModerator, setIsModerator] = useState(false)
-  const [pending, setPending] = useState<PendingRow[]>([])
   const [verified, setVerified] = useState<VerifiedRecipe[]>([])
 
   const load = useCallback(async () => {
@@ -49,18 +40,9 @@ export function RecipeCommunityPanel({
         accessToken,
       )
       setVerified(Array.isArray(verifiedList) ? verifiedList : [])
-
-      if (modBody.isModerator) {
-        setIsModerator(true)
-        const pendBody = await apiGet<PendingRow[]>('/recipe-feedback/pending', accessToken)
-        setPending(Array.isArray(pendBody) ? pendBody : [])
-      } else {
-        setIsModerator(false)
-        setPending([])
-      }
+      setIsModerator(Boolean(modBody.isModerator))
     } catch {
       setIsModerator(false)
-      setPending([])
       setVerified([])
     }
   }, [accessToken])
@@ -68,24 +50,6 @@ export function RecipeCommunityPanel({
   useEffect(() => {
     void load()
   }, [load])
-
-  async function moderate(id: string, status: 'approved' | 'rejected') {
-    setBusy(true)
-    setError('')
-    try {
-      const body = await apiPatch<{ message?: string }>(
-        `/recipe-feedback/${id}/moderate`,
-        accessToken,
-        { status },
-      )
-      setMessage(body.message ?? `Review ${status}.`)
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Moderation failed')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <section className="card cardWide recipeCommunityPanel">
@@ -118,47 +82,19 @@ export function RecipeCommunityPanel({
         <p className="hint">No verified recipes yet — submit ratings to build community scores.</p>
       )}
 
-      {isModerator ? (
-        <div className="moderationQueue">
-          <h3>Moderation queue</h3>
-          {pending.length === 0 ? (
-            <p className="hint">No pending reviews.</p>
-          ) : (
-            <ul className="moderationList">
-              {pending.map((row) => (
-                <li key={row.id} className="moderationItem">
-                  <p>
-                    <strong>{row.recipeTitle}</strong> · ★{row.rating} · {row.authorEmail}
-                  </p>
-                  {row.reviewText ? <p className="hint">{row.reviewText}</p> : null}
-                  <div className="row">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void moderate(row.id, 'approved')}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy}
-                      onClick={() => void moderate(row.id, 'rejected')}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : (
+      {isModerator && moderationInAdminTab ? (
         <p className="hint">
-          Moderation is available to accounts listed in <code>RECIPE_MODERATOR_EMAILS</code>{' '}
-          (demo: <code>demo@numbers.local</code>).
+          You are a recipe moderator — use the{' '}
+          {onOpenAdmin ? (
+            <button type="button" className="linkButton" onClick={onOpenAdmin}>
+              Admin
+            </button>
+          ) : (
+            'Admin'
+          )}{' '}
+          tab for the review queue.
         </p>
-      )}
+      ) : null}
     </section>
   )
 }

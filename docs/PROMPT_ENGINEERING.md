@@ -36,12 +36,34 @@ Execution: `apps/api/src/assistant/assistant-tools.service.ts`
 | `get_recipe` | Ingredients + steps |
 | `get_nutrition_summary` | Day/week intake vs targets |
 | `get_chart_data` | Series for trends / macros |
+| `search_recipes` | Catalog search + RAG |
+| `get_daily_check_in` | Sleep, water, mood, steps (day or week) |
+| `update_health_profile` | Profile fields during setup or chat |
+| `update_nutrition_targets` | Calorie/macro targets (AI, formula, manual) |
+| `update_nutrition_preferences` | Meals/snacks per day, `preferred_meal_times` (incl. `snack_2`) |
+
+**Count:** 11 tools in `assistant-tool-definitions.ts`. User-facing logging for habits is `PUT /daily-check-in` on Overview (not a wingman tool).
 
 Tool traces are stored on assistant messages (`toolTraces` JSON).
 
 ## Confirmed actions (not silent tools)
 
-Weight and activity **writes** use rule parsing + UI confirm (`confirm_log_activity`, `confirm_log_weight`), not automatic tool execution.
+Writes use rule parsing and/or scripted CTAs + UI confirm before the database changes:
+
+| Action | Purpose |
+|--------|---------|
+| `confirm_log_activity` | Activity session |
+| `confirm_log_weight` | Weigh-in |
+| `confirm_regenerate_meal` | Replace one planned meal |
+| `confirm_generate_shopping_list` | Shopping list from plan |
+| `confirm_mark_meal_eaten` | Mark plan slot eaten |
+| `confirm_generate_meal_plan` | New meal plan |
+| `confirm_onboarding_skip` | Dismiss setup wizard |
+| `confirm_onboarding_ai_targets` | AI nutrition targets in onboarding |
+| `confirm_onboarding_formula_targets` | Formula targets in onboarding |
+| `confirm_onboarding_meal_defaults` | Meal/snack defaults in onboarding |
+
+See [WINGMAN_ONBOARDING.md](./WINGMAN_ONBOARDING.md) for onboarding confirms.
 
 ## Review demo prompts
 

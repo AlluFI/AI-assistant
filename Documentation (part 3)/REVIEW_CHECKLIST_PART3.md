@@ -18,7 +18,8 @@ Short live-demo script for reviewers. Pair with [TEST_MATRIX_PART3.md](./TEST_MA
 | # | Show | Talk track |
 |---|------|------------|
 | 1 | Full app tabs (Overview, Nutrition, Weight & activity) | Parts 1–2 foundation in same repo |
-| 2 | Wingman FAB + nudges | Reminders + chat entry point |
+| 1b | Overview → Daily check-in (optional steps) | Steps on Today; **Check-in (7d)** on wellness gauge when habits logged |
+| 2 | Wingman FAB + nudges | Reminders + chat entry point; new users see setup wizard (`docs/WINGMAN_ONBOARDING.md`) |
 | 3 | `What's my current BMI?` | `get_health_metrics` — real profile data |
 | 4 | `What's on my meal plan today?` | `get_meal_plan` — matches Nutrition tab |
 | 5 | `Show my weight trend for the last month` | Chart `ui_block` (line) from `get_chart_data` |
@@ -40,4 +41,4 @@ Short live-demo script for reviewers. Pair with [TEST_MATRIX_PART3.md](./TEST_MA
 - How is conversation history stored? (Prisma threads + optional LLM summary)
 - What happens when the LLM API is down? (disabled message / provider unset)
 
-Prepare answers from `docs/ARCHITECTURE.md`, `docs/STACK.md`, and `Documentation (part 1 & 2)/SECURITY_AND_AI_DECISIONS.md`.
+Prepare answers from `docs/ARCHITECTURE.md`, `docs/WINGMAN_ONBOARDING.md`, `docs/DAILY_WELLNESS.md`, `docs/STACK.md`, and `Documentation (part 1 & 2)/SECURITY_AND_AI_DECISIONS.md`.

@@ -25,6 +25,7 @@ import { AiModule } from './ai/ai.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MealPhotosModule } from './meal-photos/meal-photos.module';
 import { DailyWellnessModule } from './daily-wellness/daily-wellness.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { DailyWellnessModule } from './daily-wellness/daily-wellness.module';
     AssistantModule,
     MealPhotosModule,
     DailyWellnessModule,
+    AdminModule,
     HealthModule,
   ],
   providers: [
