@@ -8,7 +8,10 @@ import { RecipeSearchModal } from './RecipeSearchModal'
 import { ShoppingListPanel } from './ShoppingListPanel'
 import {
   buildPreferredMealTimesPayload,
+  formatMealTimeSlotLabel,
+  mergeMealTimesForSnackCount,
   parsePreferredMealTimes,
+  preferredMealTimeSlots,
 } from './nutritionFormUtils'
 import type {
   DailyAnalytics,
@@ -68,12 +71,9 @@ export function NutritionPanel({
   const [macroFats, setMacroFats] = useState('')
   const [mealsPerDay, setMealsPerDay] = useState('3')
   const [snacksPerDay, setSnacksPerDay] = useState('0')
-  const [mealTimes, setMealTimes] = useState({
-    breakfast: '08:00',
-    lunch: '12:30',
-    dinner: '19:00',
-    snack: '15:00',
-  })
+  const [mealTimes, setMealTimes] = useState<Record<string, string>>(() =>
+    parsePreferredMealTimes(null, 0),
+  )
   const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [weeklyAnalytics, setWeeklyAnalytics] = useState<WeeklyAnalytics | null>(null)
   const [mealPlans, setMealPlans] = useState<MealPlanListItem[]>([])
@@ -110,7 +110,9 @@ export function NutritionPanel({
         if (s.carbs != null) setMacroCarbs(String(s.carbs))
         if (s.fats != null) setMacroFats(String(s.fats))
       }
-      setMealTimes(parsePreferredMealTimes(np?.preferredMealTimes))
+      setMealTimes(
+        parsePreferredMealTimes(np?.preferredMealTimes, np?.snacksPerDay ?? 0),
+      )
     } catch {
       setError('Failed to load nutrition profile')
     }
@@ -134,7 +136,10 @@ export function NutritionPanel({
       dislikedIngredients: disliked.split(',').map((s) => s.trim()).filter(Boolean),
       mealsPerDay: Number.isFinite(meals) ? Math.min(6, Math.max(1, meals)) : 3,
       snacksPerDay: Number.isFinite(snacks) ? Math.min(4, Math.max(0, snacks)) : 0,
-      preferredMealTimes: buildPreferredMealTimesPayload(mealTimes),
+      preferredMealTimes: buildPreferredMealTimesPayload(
+        mealTimes,
+        Number.isFinite(snacks) ? Math.min(4, Math.max(0, snacks)) : 0,
+      ),
     }
 
     if (Number.isFinite(cal) && cal >= 800 && cal <= 6000) {
@@ -282,6 +287,48 @@ export function NutritionPanel({
     }
   }
 
+  async function applyAiRecommended() {
+    setBusy(true)
+    setError('')
+    try {
+      const body = await apiPost<{
+        calorieTarget?: number
+        macroTargets?: { protein?: number; carbs?: number; fats?: number }
+        calorieTargetSource?: string
+      }>('/nutrition/profile/apply-ai-targets', accessToken)
+      if (body.calorieTarget) setCalorieTarget(String(body.calorieTarget))
+      if (body.macroTargets) {
+        setMacroProtein(String(body.macroTargets.protein ?? ''))
+        setMacroCarbs(String(body.macroTargets.carbs ?? ''))
+        setMacroFats(String(body.macroTargets.fats ?? ''))
+      }
+      const source = body.calorieTargetSource === 'ai_suggested' ? 'AI' : 'formula'
+      setMessage(`Applied ${source} calorie and macro recommendations from your health profile`)
+      await loadProfile()
+      await loadDailyAnalytics()
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Could not apply AI recommendations',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const snackCount = useMemo(() => {
+    const n = Math.round(Number(snacksPerDay))
+    return Number.isFinite(n) ? Math.min(4, Math.max(0, n)) : 0
+  }, [snacksPerDay])
+
+  const mealTimeSlots = useMemo(
+    () => preferredMealTimeSlots(snackCount),
+    [snackCount],
+  )
+
+  useEffect(() => {
+    setMealTimes((prev) => mergeMealTimesForSnackCount(prev, snackCount))
+  }, [snackCount])
+
   async function persistNutritionPrefs() {
     const calRaw = calorieTarget.trim()
     if (calRaw) {
@@ -427,12 +474,12 @@ export function NutritionPanel({
         <fieldset className="profileSection mealTimesFieldset">
           <legend>Preferred meal times (UTC)</legend>
           <div className="formGrid">
-            {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((slot) => (
+            {mealTimeSlots.map((slot) => (
               <label key={slot}>
-                {slot}
+                {formatMealTimeSlotLabel(slot)}
                 <input
                   type="time"
-                  value={mealTimes[slot]}
+                  value={mealTimes[slot] ?? ''}
                   disabled={busy}
                   onChange={(e) =>
                     setMealTimes((prev) => ({ ...prev, [slot]: e.target.value }))
@@ -442,9 +489,12 @@ export function NutritionPanel({
             ))}
           </div>
         </fieldset>
-        <div className="row">
+        <div className="row nutritionTargetActions">
           <button type="button" className="secondary" onClick={() => void applySuggested()} disabled={busy}>
-            Use suggested targets
+            Use formula targets
+          </button>
+          <button type="button" className="secondary" onClick={() => void applyAiRecommended()} disabled={busy}>
+            AI recommend targets
           </button>
           <button type="button" onClick={() => void saveNutrition()} disabled={busy}>
             Save preferences

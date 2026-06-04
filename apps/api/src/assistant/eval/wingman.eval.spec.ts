@@ -37,4 +37,15 @@ describe('wingman golden routing', () => {
       inferExpectedTools('Find high protein chicken dinner recipes'),
     ).toContain('search_recipes');
   });
+
+  it('detects nutrition target updates', () => {
+    expect(
+      inferExpectedTools(
+        'Recommend and set my calorie and macro targets from my health profile',
+      ),
+    ).toContain('update_nutrition_targets');
+    expect(
+      inferExpectedTools('Set my daily calories to 2400'),
+    ).toContain('update_nutrition_targets');
+  });
 });

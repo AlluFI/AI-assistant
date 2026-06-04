@@ -39,6 +39,18 @@
     "anyOfTools": true
   },
   {
+    "id": "update-targets-ai",
+    "message": "Recommend and set my calorie and macro targets from my health profile",
+    "expectTools": ["update_nutrition_targets"],
+    "argHints": { "mode": "ai_recommend" }
+  },
+  {
+    "id": "update-targets-manual",
+    "message": "Set my daily calories to 2400",
+    "expectTools": ["update_nutrition_targets"],
+    "argHints": { "mode": "manual" }
+  },
+  {
     "id": "chart-weight",
     "message": "Show my weight trend for the last month",
     "expectTools": ["get_chart_data"],

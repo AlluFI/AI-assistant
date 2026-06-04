@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { OpenAiClientService } from '../ai/openai-client.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalorieTargetService } from './calorie-target.service';
 import { NutritionProfileUpdateDto } from './dto/nutrition-profile-update.dto';
+import { validateAiTargetRecommendation } from './nutrition-target-recommendation.util';
 import { CUISINE_VALUES } from '../shared/dietary-catalog';
 
 @Injectable()
@@ -10,6 +16,7 @@ export class NutritionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly calorieTargets: CalorieTargetService,
+    private readonly openai: OpenAiClientService,
   ) {}
 
   async getCombinedProfile(userId: string) {
@@ -94,6 +101,84 @@ export class NutritionService {
       calorieTarget: computed.calories,
       calorieTargetSource: 'computed',
       macroTargets: computed.macros,
+    });
+  }
+
+  async applyAiSuggestedTargets(userId: string) {
+    const [health, nutrition] = await Promise.all([
+      this.prisma.healthProfile.findUnique({ where: { userId } }),
+      this.prisma.nutritionProfile.findUnique({ where: { userId } }),
+    ]);
+    const computed = this.calorieTargets.computeFromProfile(health);
+    if (!computed) {
+      throw new NotFoundException(
+        'Insufficient health profile data to recommend targets',
+      );
+    }
+    if (!this.openai.apiKey) {
+      throw new ServiceUnavailableException(
+        'AI recommendations are not configured (missing OPENAI_API_KEY)',
+      );
+    }
+
+    const profilePayload = {
+      health: health
+        ? {
+            age: health.age,
+            gender: health.gender,
+            weightKg: health.weightKg?.toString(),
+            heightCm: health.heightCm?.toString(),
+            targetWeightKg: health.targetWeightKg?.toString(),
+            activityLevel: health.activityLevel,
+            weeklyActivityDays: health.weeklyActivityDays,
+            fitnessGoalPrimary: health.fitnessGoalPrimary,
+            dietaryPreferences: health.dietaryPreferences,
+            dietaryRestrictions: health.dietaryRestrictions,
+            occupationType: health.occupationType,
+          }
+        : null,
+      nutrition: nutrition
+        ? {
+            mealsPerDay: nutrition.mealsPerDay,
+            snacksPerDay: nutrition.snacksPerDay,
+            cuisinePreferences: nutrition.cuisinePreferences,
+            dislikedIngredients: nutrition.dislikedIngredients,
+          }
+        : null,
+      formulaBaseline: computed,
+    };
+
+    const ai = await this.openai.chatJson<{
+      calories: number;
+      macros: { protein: number; carbs: number; fats: number };
+      rationale?: string;
+    }>(
+      `You are a sports nutrition coach. Recommend daily calorie and macro targets (grams) from the user's health profile and goals.
+Return strict JSON only: {"calories": number, "macros": {"protein": number, "carbs": number, "fats": number}, "rationale": string}.
+Rules:
+- Non-medical, practical guidance only.
+- Respect dietary restrictions and preferences (e.g. higher protein for high_protein, gluten-free does not change macros).
+- Align with fitness goal (loss, maintenance, muscle gain).
+- Use formulaBaseline as a starting anchor; adjust macros for goal (e.g. more protein for muscle, moderate deficit for loss).
+- calories between 1200 and 6000; macros must sum to roughly calories (±15%).
+- rationale: 1-2 short sentences.`,
+      JSON.stringify(profilePayload),
+      { temperature: 0.35, topP: 0.9 },
+    );
+
+    const validated = validateAiTargetRecommendation(ai);
+    if (!validated) {
+      return this.upsertNutritionProfile(userId, {
+        calorieTarget: computed.calories,
+        calorieTargetSource: 'computed',
+        macroTargets: computed.macros,
+      });
+    }
+
+    return this.upsertNutritionProfile(userId, {
+      calorieTarget: validated.calories,
+      calorieTargetSource: 'ai_suggested',
+      macroTargets: validated.macros,
     });
   }
 }

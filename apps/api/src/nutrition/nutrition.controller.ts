@@ -51,4 +51,9 @@ export class NutritionController {
   applySuggested(@Req() req: AuthRequest) {
     return this.nutrition.applySuggestedTargets(req.user.userId);
   }
+
+  @Post('profile/apply-ai-targets')
+  applyAiTargets(@Req() req: AuthRequest) {
+    return this.nutrition.applyAiSuggestedTargets(req.user.userId);
+  }
 }

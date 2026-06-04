@@ -1,7 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import type { NutritionProfile } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ProfileService } from '../profile/profile.service';
+import { NutritionProfileUpdateDto } from '../nutrition/dto/nutrition-profile-update.dto';
+import { NutritionService } from '../nutrition/nutrition.service';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { RecipesService } from '../recipes/recipes.service';
 import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
@@ -15,6 +23,7 @@ export class AssistantToolsService {
     private readonly analytics: AnalyticsService,
     private readonly profile: ProfileService,
     private readonly nutritionAnalytics: NutritionAnalyticsService,
+    private readonly nutrition: NutritionService,
     private readonly recipes: RecipesService,
   ) {}
 
@@ -30,6 +39,8 @@ export class AssistantToolsService {
         return this.getRecipe(userId, args);
       case 'get_nutrition_summary':
         return this.getNutritionSummary(userId, args);
+      case 'update_nutrition_targets':
+        return this.updateNutritionTargets(userId, args);
       case 'get_chart_data':
         return this.getChartData(userId, args);
       case 'search_recipes':
@@ -409,6 +420,129 @@ export class AssistantToolsService {
       };
     }
     return { recipeId: slot.recipeId, title: slot.title };
+  }
+
+  private async updateNutritionTargets(
+    userId: string,
+    args: Record<string, unknown>,
+  ) {
+    const mode = this.enumArg(
+      args.mode,
+      ['ai_recommend', 'formula', 'manual'],
+      'mode',
+    );
+    if (!mode) {
+      throw new BadRequestException('mode is required');
+    }
+
+    try {
+      if (mode === 'ai_recommend') {
+        const row = await this.nutrition.applyAiSuggestedTargets(userId);
+        return this.formatNutritionTargetsResult(row);
+      }
+      if (mode === 'formula') {
+        const row = await this.nutrition.applySuggestedTargets(userId);
+        return this.formatNutritionTargetsResult(row);
+      }
+
+      const cal =
+        args.calories != null ? Math.round(Number(args.calories)) : undefined;
+      const protein =
+        args.protein != null ? Math.round(Number(args.protein)) : undefined;
+      const carbs =
+        args.carbs != null ? Math.round(Number(args.carbs)) : undefined;
+      const fats =
+        args.fats != null ? Math.round(Number(args.fats)) : undefined;
+
+      if (
+        cal == null &&
+        protein == null &&
+        carbs == null &&
+        fats == null
+      ) {
+        throw new BadRequestException(
+          'manual mode requires calories and/or protein, carbs, and fats',
+        );
+      }
+
+      const patch: NutritionProfileUpdateDto = {};
+
+      if (cal != null) {
+        if (!Number.isFinite(cal) || cal < 800 || cal > 6000) {
+          throw new BadRequestException(
+            'calories must be between 800 and 6000',
+          );
+        }
+        patch.calorieTarget = cal;
+        patch.calorieTargetSource = 'manual';
+      }
+
+      const macroCount = [protein, carbs, fats].filter((v) => v != null).length;
+      if (macroCount > 0 && macroCount < 3) {
+        throw new BadRequestException(
+          'manual mode requires protein, carbs, and fats together',
+        );
+      }
+      if (protein != null && carbs != null && fats != null) {
+        if (
+          !Number.isFinite(protein) ||
+          !Number.isFinite(carbs) ||
+          !Number.isFinite(fats) ||
+          protein < 40 ||
+          protein > 400 ||
+          carbs < 50 ||
+          carbs > 800 ||
+          fats < 20 ||
+          fats > 250
+        ) {
+          throw new BadRequestException('macro values are out of allowed range');
+        }
+        patch.macroTargets = { protein, carbs, fats };
+      }
+
+      const row = await this.nutrition.upsertNutritionProfile(userId, patch);
+      return this.formatNutritionTargetsResult(row);
+    } catch (e) {
+      if (e instanceof NotFoundException) {
+        return {
+          updated: false,
+          error: 'insufficient_profile',
+          message:
+            'Add weight, height, and age in your health profile before recommending targets.',
+        };
+      }
+      if (e instanceof ServiceUnavailableException) {
+        return {
+          updated: false,
+          error: 'ai_unavailable',
+          message:
+            'AI recommendations are not configured. Use formula mode or set targets manually in the Nutrition tab.',
+        };
+      }
+      throw e;
+    }
+  }
+
+  private formatNutritionTargetsResult(row: NutritionProfile) {
+    const macros = row.macroTargets as {
+      protein?: number;
+      carbs?: number;
+      fats?: number;
+    } | null;
+    return {
+      updated: true,
+      calorieTarget: row.calorieTarget,
+      calorieTargetSource: row.calorieTargetSource,
+      macroTargets: macros
+        ? {
+            protein: macros.protein ?? null,
+            carbs: macros.carbs ?? null,
+            fats: macros.fats ?? null,
+          }
+        : null,
+      message:
+        'Saved calorie and macro targets. Meal plans and nutrition summaries will use these values.',
+    };
   }
 
   private async getNutritionSummary(

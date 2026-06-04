@@ -22,6 +22,13 @@ export function inferExpectedTools(message: string): string[] {
   } else if (/meal plan|what's for|whats for|lunch today|dinner today/i.test(lower)) {
     tools.push('get_meal_plan');
   }
+  if (
+    /set my (daily )?(calorie|macro)|update my (calorie|macro|target)|change my (calorie|macro)|recommend.*(calorie|macro|target)|apply.*(calorie|macro|target)|adjust my (calorie|macro|target)/i.test(
+      lower,
+    )
+  ) {
+    tools.push('update_nutrition_targets');
+  }
   if (/calorie|protein target|macro|consumed today/i.test(lower)) {
     tools.push('get_nutrition_summary');
   }

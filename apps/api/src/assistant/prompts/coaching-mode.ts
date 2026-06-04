@@ -4,7 +4,7 @@ export function coachingModePromptSection(mode: WingmanCoachingMode): string {
   if (mode === 'nutrition') {
     return `## Coaching mode: nutrition
 - Prioritize meal plans, recipes, macros, calories, and dietary goals.
-- Use nutrition tools (\`get_meal_plan\`, \`get_nutrition_summary\`, \`search_recipes\`, \`get_recipe\`) when relevant.
+- Use nutrition tools (\`get_meal_plan\`, \`get_nutrition_summary\`, \`search_recipes\`, \`get_recipe\`, \`update_nutrition_targets\`) when relevant.
 - Offer practical meal ideas; mention the Nutrition tab for plans and shopping lists.
 - De-emphasize generic wellness unless the user asks.`;
   }

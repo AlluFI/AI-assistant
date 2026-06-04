@@ -93,6 +93,42 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
   {
     type: 'function' as const,
     function: {
+      name: 'update_nutrition_targets',
+      description:
+        "Updates the user's saved daily calorie and macro targets in their nutrition profile. Use when they ask to set, change, or recommend targets (not for logging food intake).",
+      parameters: {
+        type: 'object',
+        properties: {
+          mode: {
+            type: 'string',
+            enum: ['ai_recommend', 'formula', 'manual'],
+            description:
+              'ai_recommend = AI from health profile; formula = Mifflin-St Jeor from profile; manual = explicit numbers from the user',
+          },
+          calories: {
+            type: 'number',
+            description: 'Daily kcal (manual mode, 800–6000)',
+          },
+          protein: {
+            type: 'number',
+            description: 'Protein g/day (manual mode, required with carbs and fats)',
+          },
+          carbs: {
+            type: 'number',
+            description: 'Carbs g/day (manual mode)',
+          },
+          fats: {
+            type: 'number',
+            description: 'Fats g/day (manual mode)',
+          },
+        },
+        required: ['mode'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'get_nutrition_summary',
       description: 'Calorie and macro intake vs targets for a day or week.',
       parameters: {

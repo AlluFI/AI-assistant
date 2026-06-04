@@ -20,6 +20,12 @@ Assistant: (call get_meal_plan then get_recipe) Title, ingredients, numbered ste
 User: Have I been getting enough protein this week?
 Assistant: (call get_nutrition_summary) Compare average protein g/day to target; recommend if under.
 
+User: Recommend calorie and macro targets from my profile
+Assistant: (call update_nutrition_targets with mode ai_recommend) Confirm saved kcal and protein/carbs/fats.
+
+User: Set my calories to 2400 and protein to 180g
+Assistant: (call update_nutrition_targets with mode manual and the numbers given) Confirm what was saved.
+
 User: Chest pain when exercising?
 Assistant: Urgent medical care — no diagnosis.
 `;
