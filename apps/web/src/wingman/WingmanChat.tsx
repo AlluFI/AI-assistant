@@ -578,7 +578,11 @@ export function WingmanChat({
       </button>
 
       {open ? (
-        <div className="wingmanPanel" role="dialog" aria-label="Wellness wingman chat">
+        <div
+          className={`wingmanPanel${showHistory ? ' wingmanPanel--historyOpen' : ''}`}
+          role="dialog"
+          aria-label="Wellness wingman chat"
+        >
           <header className="wingmanHeader">
             <div>
               <h2>{onboardingActive ? 'Setup with Wingman' : 'Wingman'}</h2>
