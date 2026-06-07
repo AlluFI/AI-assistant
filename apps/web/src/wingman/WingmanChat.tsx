@@ -677,7 +677,10 @@ export function WingmanChat({
           </header>
 
           {showHistory ? (
-            <section className="wingmanHistoryPanel" aria-label="Past conversations">
+            <section
+              className="wingmanHistoryPanel wingmanHistoryPanel--full"
+              aria-label="Past conversations"
+            >
               <div className="wingmanHistoryHead">
                 <p className="wingmanHistoryIntro">Earlier Wingman chats on this account.</p>
                 <button
@@ -689,111 +692,116 @@ export function WingmanChat({
                   New chat
                 </button>
               </div>
-              {historyLoading ? (
-                <p className="wingmanHistoryEmpty">Loading…</p>
-              ) : threadList.length === 0 ? (
-                <p className="wingmanHistoryEmpty">No saved conversations yet.</p>
-              ) : (
-                <ul className="wingmanHistoryList">
-                  {threadList.map((t) => {
-                    const active = t.id === threadId
-                    const label =
-                      t.title?.trim() ||
-                      (t.preview
-                        ? t.preview.slice(0, 48) + (t.preview.length > 48 ? '…' : '')
-                        : 'Conversation')
-                    return (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          className={`wingmanHistoryItem${active ? ' active' : ''}`}
-                          disabled={busy}
-                          onClick={() => void switchThread(t.id)}
-                        >
-                          <span className="wingmanHistoryTitle">{label}</span>
-                          <span className="wingmanHistoryMeta">
-                            {formatThreadWhen(t.updatedAt)}
-                            {t.messageCount > 0 ? ` · ${t.messageCount} messages` : ''}
-                          </span>
-                          {t.preview && t.id !== threadId ? (
-                            <span className="wingmanHistoryPreview">{t.preview}</span>
-                          ) : null}
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </section>
-          ) : null}
-
-          {showMemory ? (
-            <section className="wingmanMemoryPanel" aria-label="Long-term memory">
-              <p className="wingmanMemoryIntro">
-                Saved across all chats (not this thread only). Profile restrictions are
-                seeded automatically.
-              </p>
-              {memory?.narrative ? (
-                <p className="wingmanMemoryNarrative">{memory.narrative}</p>
-              ) : null}
-              {memory?.facts?.length ? (
-                <ul className="wingmanMemoryList">
-                  {memory.facts.map((f) => (
-                    <li key={`${f.category}-${f.text}`}>
-                      <span className="wingmanMemoryTag">{f.category}</span> {f.text}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="wingmanMemoryEmpty">No long-term memory yet — chat to build it.</p>
-              )}
-              <button
-                type="button"
-                className="wingmanMemoryClear"
-                disabled={busy || !memory?.facts?.length && !memory?.narrative}
-                onClick={() => void clearMemory()}
-              >
-                Clear memory
-              </button>
-            </section>
-          ) : null}
-
-          {error ? <p className="wingmanErr">{error}</p> : null}
-
-          {showStarterChips ? (
-            <div className="wingmanStarters">
-              {WINGMAN_STARTER_PROMPTS[
-                coachingMode === 'onboarding' ? 'balanced' : coachingMode
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  className="wingmanStarterChip"
-                  disabled={busy}
-                  onClick={() => void sendText(prompt)}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="wingmanMessages" ref={listRef}>
-            {messages.map((m) => (
-              <div key={m.id} className={`wingmanMsg ${m.role}`}>
-                {m.content}
-                {m.uiBlocks?.length ? (
-                  <div className="wingmanBlocks">
-                    {m.uiBlocks.map((b, i) =>
-                      renderUiBlock(b, `${m.id}-block-${i}`, busy, runCta),
-                    )}
-                  </div>
-                ) : null}
+              <div className="wingmanHistoryScroll">
+                {historyLoading ? (
+                  <p className="wingmanHistoryEmpty">Loading…</p>
+                ) : threadList.length === 0 ? (
+                  <p className="wingmanHistoryEmpty">No saved conversations yet.</p>
+                ) : (
+                  <ul className="wingmanHistoryList">
+                    {threadList.map((t) => {
+                      const active = t.id === threadId
+                      const label =
+                        t.title?.trim() ||
+                        (t.preview
+                          ? t.preview.slice(0, 48) + (t.preview.length > 48 ? '…' : '')
+                          : 'Conversation')
+                      return (
+                        <li key={t.id}>
+                          <button
+                            type="button"
+                            className={`wingmanHistoryItem${active ? ' active' : ''}`}
+                            disabled={busy}
+                            onClick={() => void switchThread(t.id)}
+                          >
+                            <span className="wingmanHistoryTitle">{label}</span>
+                            <span className="wingmanHistoryMeta">
+                              {formatThreadWhen(t.updatedAt)}
+                              {t.messageCount > 0 ? ` · ${t.messageCount} messages` : ''}
+                            </span>
+                            {t.preview ? (
+                              <span className="wingmanHistoryPreview">{t.preview}</span>
+                            ) : null}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
               </div>
-            ))}
-            {busy ? <p className="wingmanMsg assistant wingmanTyping">…</p> : null}
-          </div>
+            </section>
+          ) : (
+            <>
+              {showMemory ? (
+                <section className="wingmanMemoryPanel" aria-label="Long-term memory">
+                  <p className="wingmanMemoryIntro">
+                    Saved across all chats (not this thread only). Profile restrictions are
+                    seeded automatically.
+                  </p>
+                  {memory?.narrative ? (
+                    <p className="wingmanMemoryNarrative">{memory.narrative}</p>
+                  ) : null}
+                  {memory?.facts?.length ? (
+                    <ul className="wingmanMemoryList">
+                      {memory.facts.map((f) => (
+                        <li key={`${f.category}-${f.text}`}>
+                          <span className="wingmanMemoryTag">{f.category}</span> {f.text}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="wingmanMemoryEmpty">No long-term memory yet — chat to build it.</p>
+                  )}
+                  <button
+                    type="button"
+                    className="wingmanMemoryClear"
+                    disabled={busy || (!memory?.facts?.length && !memory?.narrative)}
+                    onClick={() => void clearMemory()}
+                  >
+                    Clear memory
+                  </button>
+                </section>
+              ) : null}
 
+              {error ? <p className="wingmanErr">{error}</p> : null}
+
+              {showStarterChips ? (
+                <div className="wingmanStarters">
+                  {WINGMAN_STARTER_PROMPTS[
+                    coachingMode === 'onboarding' ? 'balanced' : coachingMode
+                  ].map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className="wingmanStarterChip"
+                      disabled={busy}
+                      onClick={() => void sendText(prompt)}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="wingmanMessages" ref={listRef}>
+                {messages.map((m) => (
+                  <div key={m.id} className={`wingmanMsg ${m.role}`}>
+                    {m.content}
+                    {m.uiBlocks?.length ? (
+                      <div className="wingmanBlocks">
+                        {m.uiBlocks.map((b, i) =>
+                          renderUiBlock(b, `${m.id}-block-${i}`, busy, runCta),
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {busy ? <p className="wingmanMsg assistant wingmanTyping">…</p> : null}
+              </div>
+            </>
+          )}
+
+          {!showHistory ? (
           <form
             className="wingmanComposer"
             onSubmit={(e) => {
@@ -812,6 +820,7 @@ export function WingmanChat({
               Send
             </button>
           </form>
+          ) : null}
         </div>
       ) : null}
     </>

@@ -78,6 +78,22 @@
     0 0 0 1px rgb(255 255 255 / 6%);
 }
 
+.wingmanPanel--historyOpen {
+  height: min(32rem, calc(100vh - 7rem));
+}
+
+@media (min-width: 768px) {
+  .wingmanPanel--historyOpen {
+    height: min(40rem, calc(100vh - 6rem));
+  }
+}
+
+@media (min-width: 1200px) {
+  .wingmanPanel--historyOpen {
+    height: min(48rem, calc(100vh - 5rem));
+  }
+}
+
 .wingmanHeader {
   flex-shrink: 0;
   display: flex;
@@ -267,26 +283,21 @@
   overflow-y: auto;
 }
 
-.wingmanPanel--historyOpen .wingmanHistoryPanel {
+.wingmanHistoryPanel--full {
   flex: 1 1 auto;
-  min-height: 14rem;
-  max-height: min(28rem, 55vh);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+  border-bottom: none;
+  overflow: hidden;
 }
 
-@media (min-width: 768px) {
-  .wingmanPanel--historyOpen .wingmanHistoryPanel {
-    min-height: 16rem;
-    max-height: min(32rem, 58vh);
-  }
-}
-
-.wingmanPanel--historyOpen .wingmanStarters {
-  display: none;
-}
-
-.wingmanPanel--historyOpen .wingmanMessages {
-  flex: 0 1 auto;
-  max-height: 9.5rem;
+.wingmanHistoryScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .wingmanHistoryHead {
