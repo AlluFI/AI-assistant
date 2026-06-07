@@ -396,46 +396,6 @@ export class AssistantWingmanService {
       };
     }
 
-    const mealSlot = inferPlannedMealSlotToolCall(userMessage);
-    if (mealSlot && isPlannedMealNutrientsQuestion(userMessage)) {
-      const plan = (await this.tools.execute(userId, 'get_meal_plan', {
-        date: mealSlot.date,
-      })) as {
-        error?: string;
-        meals?: Array<{
-          mealType: string;
-          title: string;
-          calories: number | null;
-          protein: number | null;
-          carbs: number | null;
-          fats: number | null;
-          recipeLinked?: boolean;
-        }>;
-      };
-      if (plan.error) {
-        return {
-          content:
-            'Create or activate a meal plan in the Nutrition tab first, then I can read breakfast, lunch, or dinner macros from your plan.',
-          uiBlocks: [
-            { type: 'cta', label: 'Open Nutrition tab', action: 'open_nutrition' },
-          ],
-        };
-      }
-      const meal = plan.meals?.find((m) => m.mealType === mealSlot.meal_type);
-      if (!meal) {
-        return {
-          content: `I don't see **${mealTypeLabel(mealSlot.meal_type).toLowerCase()}** on your plan for ${mealSlot.date}.`,
-        };
-      }
-      return {
-        content: formatPlannedMealNutrientsReply(
-          mealTypeLabel(mealSlot.meal_type),
-          mealSlot.date,
-          meal,
-        ),
-      };
-    }
-
     const addManual = parseAddManualMealIntent(userMessage);
     if (addManual) {
       const today = new Date().toISOString().slice(0, 10);
@@ -477,6 +437,46 @@ export class AssistantWingmanService {
             },
           },
         ],
+      };
+    }
+
+    const mealSlot = inferPlannedMealSlotToolCall(userMessage);
+    if (mealSlot && isPlannedMealNutrientsQuestion(userMessage)) {
+      const plan = (await this.tools.execute(userId, 'get_meal_plan', {
+        date: mealSlot.date,
+      })) as {
+        error?: string;
+        meals?: Array<{
+          mealType: string;
+          title: string;
+          calories: number | null;
+          protein: number | null;
+          carbs: number | null;
+          fats: number | null;
+          recipeLinked?: boolean;
+        }>;
+      };
+      if (plan.error) {
+        return {
+          content:
+            'Create or activate a meal plan in the Nutrition tab first, then I can read breakfast, lunch, or dinner macros from your plan.',
+          uiBlocks: [
+            { type: 'cta', label: 'Open Nutrition tab', action: 'open_nutrition' },
+          ],
+        };
+      }
+      const meal = plan.meals?.find((m) => m.mealType === mealSlot.meal_type);
+      if (!meal) {
+        return {
+          content: `I don't see **${mealTypeLabel(mealSlot.meal_type).toLowerCase()}** on your plan for ${mealSlot.date}.`,
+        };
+      }
+      return {
+        content: formatPlannedMealNutrientsReply(
+          mealTypeLabel(mealSlot.meal_type),
+          mealSlot.date,
+          meal,
+        ),
       };
     }
 

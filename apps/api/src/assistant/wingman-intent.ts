@@ -239,10 +239,22 @@ export function parseAddManualMealIntent(text: string): ParsedAddManualMeal | nu
 
   const quoted = text.match(/["“]([^"”]+)["”]/);
   const named = text.match(/\b(?:called|named|titled)\s+(.+?)(?:\s+to|\s+for|\s+on|$)/i);
-  const addMatch = text.match(
+  const addAsMealMatch = text.match(
+    /\badd\s+(?:a\s+|an\s+)?(.+?)\s+as\s+(?:a\s+|an\s+)?(?:breakfast|lunch|dinner|snack)\b/i,
+  );
+  const addToPlanMatch = text.match(
     /\badd\s+(?:a\s+|an\s+)?(.+?)\s+(?:to|on|into)\s+(?:my\s+)?(?:today'?s\s+)?(?:meal\s+)?plan/i,
   );
-  const title = (quoted?.[1] ?? named?.[1] ?? addMatch?.[1])
+  const addForPlanMatch = text.match(
+    /\badd\s+(?:a\s+|an\s+)?(.+?)\s+for\s+(?:my\s+)?(?:today'?s\s+)?(?:meal\s+)?plan/i,
+  );
+  const title = (
+    quoted?.[1] ??
+    named?.[1] ??
+    addAsMealMatch?.[1] ??
+    addToPlanMatch?.[1] ??
+    addForPlanMatch?.[1]
+  )
     ?.trim()
     .replace(/[.?!]+$/, '');
   if (!title || title.length < 2) return null;

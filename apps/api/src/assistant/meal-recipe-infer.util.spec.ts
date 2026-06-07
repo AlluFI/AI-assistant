@@ -41,6 +41,13 @@ describe('inferMealRecipeToolCall', () => {
     expect(slot?.date).toBe(utcTodayPlus(0));
   });
 
+  it('does not treat add-to-plan requests as nutrient questions', () => {
+    const msg =
+      "add a protein shake as a snack for today's meal plan";
+    expect(isPlannedMealNutrientsQuestion(msg)).toBe(false);
+    expect(inferPlannedMealSlotToolCall(msg)).toBeNull();
+  });
+
   it('normalizes get_recipe args from user message', () => {
     expect(
       normalizeRecipeToolArgs('What nutrients are in my breakfast?', {

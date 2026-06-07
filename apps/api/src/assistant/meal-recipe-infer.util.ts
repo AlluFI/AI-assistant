@@ -30,6 +30,13 @@ function parseMealType(
 
 export function isPlannedMealNutrientsQuestion(message: string): boolean {
   const lower = message.toLowerCase();
+  if (
+    /\b(add|insert|include|swap|replace|remove|delete|regenerate|mark|log|create|save|draft)\b/i.test(
+      lower,
+    )
+  ) {
+    return false;
+  }
   return NUTRIENTS_PATTERN.test(lower) && parseMealType(lower) != null;
 }
 
