@@ -45,7 +45,7 @@
   padding: 0.5rem 0.65rem;
   border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  background: var(--input-bg);
   color: var(--text);
   font: inherit;
 }
@@ -616,7 +616,7 @@
   padding: 0.3rem 0.5rem;
   border-radius: 0.4rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  background: var(--input-bg);
   color: var(--text);
   font: inherit;
 }
@@ -1065,7 +1065,7 @@
   padding: 0.6rem 0.75rem;
   border-radius: 0.55rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  background: var(--input-bg);
   color: var(--text);
   font: inherit;
   font-size: 0.95rem;

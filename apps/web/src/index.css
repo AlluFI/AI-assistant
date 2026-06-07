@@ -19,7 +19,9 @@
   --secondary-ink: #0f172a;
   --chip-bg: #f8fafc;
   --chip-ink: #334155;
+  --input-bg: #f1f5f9;
   --radius: 0.75rem;
+  color-scheme: light;
 }
 
 :root[data-theme='dark'] {
@@ -36,6 +38,8 @@
   --secondary-ink: #dbe7ff;
   --chip-bg: #122033;
   --chip-ink: #b8c9e8;
+  --input-bg: #172235;
+  color-scheme: dark;
 }
 
 *,

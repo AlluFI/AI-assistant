@@ -12,6 +12,7 @@
   cursor: pointer;
   font-size: 1.5rem;
   line-height: 1;
+  padding: 0;
   color: #fff;
   background: linear-gradient(145deg, #0d9488, #2563eb);
   box-shadow:
@@ -388,10 +389,6 @@
   border-bottom-left-radius: 0.2rem;
 }
 
-:root[data-theme='light'] .wingmanMsg.assistant {
-  background: #fff;
-}
-
 .wingmanStarters {
   flex-shrink: 0;
   display: flex;
@@ -510,7 +507,7 @@
   border-radius: 0.5rem;
   padding: 0.5rem 0.65rem;
   font: inherit;
-  background: var(--bg);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -524,17 +521,18 @@
 }
 
 .wingmanComposer button {
-  border: none;
-  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
   padding: 0.5rem 0.85rem;
-  background: var(--primary);
-  color: var(--primary-ink);
+  background: var(--chip-bg);
+  color: var(--chip-ink);
   font-weight: 600;
   cursor: pointer;
 }
 
-:root[data-theme='light'] .wingmanComposer button {
-  color: #fff;
+.wingmanComposer button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border-strong));
+  background: var(--bg-elev);
 }
 
 .wingmanComposer button:disabled {

@@ -121,9 +121,34 @@
   padding: 0.5rem 0.65rem;
   border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  background: var(--input-bg);
   color: var(--text);
   font: inherit;
+}
+
+/* Themed text fields app-wide (nutrition formGrid, meal plan rows, etc.) */
+.page input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']):not([type='range']),
+.page select,
+.page textarea {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.page input::placeholder,
+.page textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 85%, transparent);
+}
+
+.page input:focus-visible,
+.page select:focus-visible,
+.page textarea:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .timezoneFieldBlock {
@@ -223,7 +248,7 @@
   margin-bottom: 0.75rem;
 }
 
-/* Pill buttons — shared across dashboard, insights, privacy, etc. */
+/* Pill buttons — default chip style; .primary / .active for emphasis */
 button {
   font-family: inherit;
   font-size: 0.8rem;
@@ -231,6 +256,10 @@ button {
   line-height: 1.25;
   border-radius: 999px;
   cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  padding: 0.4rem 0.9rem;
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
@@ -239,17 +268,82 @@ button {
     filter 0.15s ease;
 }
 
+button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border-strong));
+  background: var(--bg-elev);
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
+button.linkButton,
+button.linkLike {
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 600;
+}
+
+button.linkButton {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+button.linkLike {
+  color: var(--primary);
+  text-decoration: underline;
+  font-size: 0.82rem;
+  padding: 0.2rem 0;
+}
+
+button.linkButton:hover:not(:disabled),
+button.linkLike:hover:not(:disabled) {
+  background: none;
+  border-color: transparent;
+  opacity: 0.88;
+}
+
+button.primary,
+.form button.primary {
+  border: none;
+  background: linear-gradient(90deg, #0f766e, #0d9488);
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(15 118 110 / 22%);
+}
+
+button.primary:hover:not(:disabled),
+.form button.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  border-color: transparent;
+}
+
+button.danger,
+.form button.danger {
+  border: none;
+  background: linear-gradient(90deg, #b91c1c, #dc2626);
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(185 28 28 / 25%);
+}
+
+button.danger:hover:not(:disabled),
+.form button.danger:hover:not(:disabled) {
+  filter: brightness(1.05);
+  border-color: transparent;
+}
+
+[data-theme='dark'] button.danger,
+[data-theme='dark'] .form button.danger {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  color: #fff;
+}
+
 button.secondary,
 .dashboardTabs button {
-  border: 1px solid var(--border-strong);
-  background: var(--chip-bg);
-  color: var(--chip-ink);
-  padding: 0.4rem 0.9rem;
+  /* Alias — same as default chip button */
 }
 
 button.secondary:hover:not(:disabled),
@@ -266,31 +360,14 @@ button.secondary.active,
   box-shadow: 0 2px 10px rgb(20 184 166 / 28%);
 }
 
+button.secondary.active:hover:not(:disabled),
+.dashboardTabs button.active:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
 .form button {
   margin-top: 0.35rem;
   padding: 0.5rem 1.15rem;
-  border: none;
-  background: linear-gradient(90deg, #0f766e, #0d9488);
-  color: #fff;
-  box-shadow: 0 2px 8px rgb(15 118 110 / 22%);
-}
-
-.form button:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
-
-.form button.secondary {
-  border: 1px solid var(--border-strong);
-  background: var(--chip-bg);
-  color: var(--chip-ink);
-  box-shadow: none;
-  padding: 0.4rem 0.9rem;
-}
-
-.form button.secondary:hover:not(:disabled) {
-  filter: none;
-  border-color: color-mix(in srgb, var(--primary) 50%, var(--border-strong));
-  background: var(--bg-elev);
 }
 
 .row,
@@ -343,7 +420,7 @@ button.secondary.active,
   padding: 0.65rem;
   border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
-  background: var(--bg-soft);
+  background: var(--input-bg);
   color: var(--text);
   resize: vertical;
 }
@@ -394,6 +471,7 @@ button.secondary.active,
   font-weight: 700;
   cursor: pointer;
   text-align: left;
+  box-shadow: none;
 }
 
 .authAccordionItem.open > .authAccordionHead {
@@ -433,10 +511,13 @@ button.secondary.active,
   text-decoration: underline;
   padding: 0.2rem 0;
   font: inherit;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .linkLike:hover {
   opacity: 0.88;
+  background: none;
 }
 
 .oauthAccordionHint {
@@ -844,17 +925,6 @@ button.secondary.active,
   margin: 1rem 0 0.35rem;
   font-size: 0.95rem;
   font-weight: 600;
-}
-
-.form button.danger {
-  background: linear-gradient(90deg, #b91c1c, #dc2626);
-  color: #fff;
-  box-shadow: 0 2px 8px rgb(185 28 28 / 25%);
-}
-
-[data-theme='dark'] .form button.danger {
-  background: linear-gradient(90deg, #dc2626, #ef4444);
-  color: #fff;
 }
 
 .totpBackupBanner {

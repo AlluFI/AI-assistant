@@ -517,7 +517,7 @@ export function NutritionPanel({
           <button type="button" className="secondary" onClick={() => void applyAiRecommended()} disabled={busy}>
             AI recommend targets
           </button>
-          <button type="button" onClick={() => void saveNutrition()} disabled={busy}>
+          <button type="button" className="secondary" onClick={() => void saveNutrition()} disabled={busy}>
             Save preferences
           </button>
         </div>

@@ -30,6 +30,16 @@
   margin-bottom: 1rem;
 }
 
+.nutritionPanel .formGrid label,
+.mealTimesFieldset label,
+.nutritionPanel .row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .nutritionChartsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -222,10 +232,10 @@
   margin-top: 0.35rem;
   font: inherit;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  padding: 0.5rem;
-  background: var(--bg);
-  color: inherit;
+  border: 1px solid var(--border-strong);
+  padding: 0.5rem 0.65rem;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .recipeRatingRow select {
@@ -457,8 +467,8 @@
   width: 100%;
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -757,21 +767,10 @@
   margin-top: 0;
 }
 
-.linkButton {
-  display: inline;
-  padding: 0;
-  margin: 0;
-  border: none;
-  background: none;
-  color: var(--primary);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .linkButton:hover {
   color: color-mix(in srgb, var(--primary) 80%, var(--text));
+  background: none;
+  border-color: transparent;
 }
 
 .mealTimesFieldset {
