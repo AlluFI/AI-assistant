@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,8 @@ import { SelectAlternativeDto } from './dto/select-alternative.dto';
 import { UpdateMealSlotDto } from './dto/update-meal-slot.dto';
 import { ReorderMealsDto } from './dto/reorder-meals.dto';
 import { AddManualMealDto } from './dto/add-manual-meal.dto';
+import { ReplaceMealRecipeDto } from './dto/replace-meal-recipe.dto';
+import { ReapplyMealPlanDto } from './dto/reapply-meal-plan.dto';
 
 type AuthRequest = Request & { user: { userId: string } };
 
@@ -29,8 +32,13 @@ export class MealPlansController {
   constructor(private readonly mealPlans: MealPlansService) {}
 
   @Get()
-  list(@Req() req: AuthRequest) {
-    return this.mealPlans.list(req.user.userId);
+  list(@Req() req: AuthRequest, @Query('date') date?: string) {
+    return this.mealPlans.list(req.user.userId, date);
+  }
+
+  @Get('history')
+  history(@Req() req: AuthRequest, @Query('q') q?: string) {
+    return this.mealPlans.listHistory(req.user.userId, q);
   }
 
   @Post('generate')
@@ -88,6 +96,21 @@ export class MealPlansController {
     @Param('mealId') mealId: string,
   ) {
     return this.mealPlans.regenerateMeal(versionId, req.user.userId, mealId);
+  }
+
+  @Post('versions/:versionId/meals/:mealId/replace-recipe')
+  replaceMealRecipe(
+    @Req() req: AuthRequest,
+    @Param('versionId') versionId: string,
+    @Param('mealId') mealId: string,
+    @Body() dto: ReplaceMealRecipeDto,
+  ) {
+    return this.mealPlans.replaceMealWithRecipe(
+      versionId,
+      req.user.userId,
+      mealId,
+      dto,
+    );
   }
 
   @Post('versions/:versionId/confirm-recipes')
@@ -176,6 +199,15 @@ export class MealPlansController {
         fats: dto.fats,
       },
     });
+  }
+
+  @Post(':planId/reapply')
+  reapply(
+    @Req() req: AuthRequest,
+    @Param('planId') planId: string,
+    @Body() dto: ReapplyMealPlanDto,
+  ) {
+    return this.mealPlans.reapplyPlan(planId, req.user.userId, dto.startDate);
   }
 
   @Get(':id')

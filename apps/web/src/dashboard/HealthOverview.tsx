@@ -149,7 +149,7 @@ export function HealthOverview({
       />
 
       {accessToken ? (
-        <>
+        <div className="todayActionsRow">
           <QuickFoodLogPanel
             accessToken={accessToken}
             busy={busy}
@@ -166,7 +166,7 @@ export function HealthOverview({
             setMessage={setMessage}
             setError={setError}
           />
-        </>
+        </div>
       ) : null}
 
       <section className="card cardSpan2 healthDashboard">

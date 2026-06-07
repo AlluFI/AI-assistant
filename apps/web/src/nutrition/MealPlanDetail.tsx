@@ -56,6 +56,8 @@ type Props = {
   onRefreshAnalytics: () => Promise<void>
   onRegeneratePlan?: (startDate: string, duration: 'daily' | 'weekly') => void
   onShoppingListCreated?: (listId: string) => void
+  onOpenPastPlans?: () => void
+  refreshKey?: number
 }
 
 function parseNutrition(raw: unknown): PlannedMealRow['nutrition'] {
@@ -89,6 +91,8 @@ export function MealPlanDetail({
   onRefreshAnalytics,
   onRegeneratePlan,
   onShoppingListCreated,
+  onOpenPastPlans,
+  refreshKey = 0,
 }: Props) {
   const [planDetail, setPlanDetail] = useState<{
     id: string
@@ -147,7 +151,7 @@ export function MealPlanDetail({
 
   useEffect(() => {
     void loadPlan()
-  }, [loadPlan])
+  }, [loadPlan, refreshKey])
 
   const activeVersion = planDetail?.versions.find((v) => v.id === versionId) ?? null
 
@@ -471,7 +475,14 @@ export function MealPlanDetail({
     return (
       <section className="card cardWide">
         <h2>Meal plan detail</h2>
-        <p className="hint">Generate a meal plan above to view and customize meals.</p>
+        <p className="hint">
+          No active meal plan for today. Generate one above, or re-apply a past plan.
+        </p>
+        {onOpenPastPlans ? (
+          <button type="button" className="secondary" onClick={onOpenPastPlans} disabled={busy}>
+            Browse past meal plans
+          </button>
+        ) : null}
       </section>
     )
   }
@@ -480,20 +491,28 @@ export function MealPlanDetail({
     <section className="card cardWide mealPlanDetail">
       <div className="mealPlanDetailHead">
         <h2>Meal plan detail</h2>
-        <label>
-          Plan
-          <select
-            value={planId ?? ''}
-            onChange={(e) => onPlanChange(e.target.value || null)}
-            disabled={busy}
-          >
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.duration} · {p.startDate}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="mealPlanDetailHeadActions">
+          <label>
+            Plan
+            <select
+              value={planId ?? ''}
+              onChange={(e) => onPlanChange(e.target.value || null)}
+              disabled={busy}
+            >
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.duration} · {p.startDate}
+                  {p.endDate && p.duration === 'weekly' ? ` – ${p.endDate}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          {onOpenPastPlans ? (
+            <button type="button" className="secondary" onClick={onOpenPastPlans} disabled={busy}>
+              Browse past plans
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {planDetail && activeVersion ? (

@@ -14,13 +14,21 @@ import { MacroNutrition } from '../shared/units';
 import {
   balanceDayNutrition,
   balancePlannedMealRows,
+  dailyCalorieTarget,
+  evaluateDayAgainstTargets,
   fitNutritionToTarget,
   newMealPlanId,
   normalizeNutrition,
   slotCalorieBudget,
+  sumMealNutrition,
 } from './meal-plan-nutrition.util';
 import type { GenerationStep, MealSlot } from './meal-plans.types';
 import { MealPlanGenerationService } from './meal-plan-generation.service';
+import {
+  planCoversDate,
+  planEndDate,
+  utcTodayIso,
+} from '../shared/meal-plan-date.util';
 
 @Injectable()
 export class MealPlansService {
@@ -32,10 +40,11 @@ export class MealPlansService {
     private readonly enhancedNutrition: EnhancedNutritionService,
   ) {}
 
-  async list(userId: string) {
+  async list(userId: string, referenceDate?: string) {
+    const today = referenceDate?.slice(0, 10) ?? utcTodayIso();
     const rows = await this.prisma.mealPlan.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       include: {
         versions: {
           orderBy: { versionNumber: 'desc' },
@@ -43,7 +52,116 @@ export class MealPlansService {
         },
       },
     });
-    return rows.filter((plan) => !isHiddenDemoMealPlanId(plan.id));
+    return rows
+      .filter((plan) => !isHiddenDemoMealPlanId(plan.id))
+      .map((plan) => this.mapPlanListItem(plan, today));
+  }
+
+  async listHistory(userId: string, q?: string) {
+    const today = utcTodayIso();
+    const rows = await this.prisma.mealPlan.findMany({
+      where: { userId },
+      orderBy: { startDate: 'desc' },
+      include: {
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    const query = q?.trim().toLowerCase() ?? '';
+    return rows
+      .filter((plan) => !isHiddenDemoMealPlanId(plan.id))
+      .filter(
+        (plan) => !planCoversDate(plan.startDate, plan.duration, today),
+      )
+      .filter((plan) => {
+        if (!query) return true;
+        const end = planEndDate(plan.startDate, plan.duration);
+        const label = `${plan.duration} ${plan.startDate} ${end}`.toLowerCase();
+        return label.includes(query) || plan.startDate.includes(query);
+      })
+      .map((plan) => this.mapPlanListItem(plan, today));
+  }
+
+  async reapplyPlan(
+    mealPlanId: string,
+    userId: string,
+    startDate: string,
+  ) {
+    if (isHiddenDemoMealPlanId(mealPlanId)) {
+      throw new NotFoundException('Meal plan not found');
+    }
+    const plan = await this.prisma.mealPlan.findFirst({
+      where: { id: mealPlanId, userId },
+    });
+    if (!plan) throw new NotFoundException('Meal plan not found');
+
+    const latestVersion = await this.prisma.mealPlanVersion.findFirst({
+      where: { mealPlanId },
+      orderBy: { versionNumber: 'desc' },
+      include: { meals: true },
+    });
+    if (!latestVersion) throw new NotFoundException('No plan version found');
+
+    await this.prisma.mealPlan.update({
+      where: { id: mealPlanId },
+      data: { startDate, updatedAt: new Date() },
+    });
+
+    await this.prisma.mealPlanVersion.updateMany({
+      where: { mealPlan: { userId } },
+      data: { isActive: false },
+    });
+
+    await this.prisma.mealPlanVersion.update({
+      where: { id: latestVersion.id },
+      data: { isActive: true },
+    });
+
+    const days = plan.duration === 'weekly' ? 7 : 1;
+    await this.syncNutritionLogs(userId, latestVersion.meals, startDate, days);
+    await this.resyncVersionNutritionLogs(latestVersion.id, userId);
+
+    return this.getPlan(mealPlanId, userId);
+  }
+
+  private mapPlanListItem(
+    plan: {
+      id: string;
+      duration: string;
+      startDate: string;
+      updatedAt: Date;
+      versions: Array<{
+        id: string;
+        versionLabel: string;
+        versionNumber: number;
+        isActive: boolean;
+      }>;
+    },
+    referenceDate: string,
+  ) {
+    const endDate = planEndDate(plan.startDate, plan.duration);
+    const coversToday = planCoversDate(
+      plan.startDate,
+      plan.duration,
+      referenceDate,
+    );
+    return {
+      id: plan.id,
+      duration: plan.duration,
+      startDate: plan.startDate,
+      endDate,
+      coversToday,
+      isExpired: !coversToday,
+      updatedAt: plan.updatedAt.toISOString(),
+      versions: plan.versions.map((v) => ({
+        id: v.id,
+        versionLabel: v.versionLabel,
+        versionNumber: v.versionNumber,
+        isActive: v.isActive,
+      })),
+    };
   }
 
   async getPlan(mealPlanId: string, userId: string) {
@@ -207,12 +325,13 @@ export class MealPlansService {
       },
     });
 
+    await this.prisma.mealPlanVersion.updateMany({
+      where: { mealPlan: { userId } },
+      data: { isActive: false },
+    });
+
     const prevVersions = await this.prisma.mealPlanVersion.count({
       where: { mealPlanId: mealPlan.id },
-    });
-    await this.prisma.mealPlanVersion.updateMany({
-      where: { mealPlanId: mealPlan.id },
-      data: { isActive: false },
     });
 
     const version = await this.prisma.mealPlanVersion.create({
@@ -389,6 +508,221 @@ export class MealPlansService {
     );
     await this.resyncVersionNutritionLogs(versionId, userId);
     return this.getVersion(versionId, userId);
+  }
+
+  async replaceMealWithRecipe(
+    versionId: string,
+    userId: string,
+    mealId: string,
+    body: {
+      recipeId: string;
+      servings?: number;
+      replanDay?: boolean;
+      preview?: boolean;
+    },
+  ) {
+    await this.assertVersionOwner(versionId, userId);
+    const built = await this.buildReplaceMealPreview(
+      versionId,
+      userId,
+      mealId,
+      body.recipeId,
+      body.servings ?? 1,
+    );
+
+    if (body.preview) {
+      return {
+        mealId: built.meal.id,
+        mealType: built.meal.mealType,
+        dayIndex: built.meal.dayIndex,
+        recipeTitle: built.recipe.title,
+        newMealNutrition: built.newNutrition,
+        projectedTotals: built.projectedTotals,
+        calorieTarget: built.calorieTarget,
+        macroTargets: built.macroTargets,
+        evaluation: built.evaluation,
+        dayMeals: built.dayMeals.map((m) => ({
+          id: m.id,
+          mealType: m.mealType,
+          title: m.title,
+          scheduledAt: m.scheduledAt.toISOString(),
+        })),
+      };
+    }
+
+    const { recipe, newNutrition, newAlts, dayMeals, evaluation } = built;
+    const mealIdToReplace = built.meal.id;
+
+    if (body.replanDay) {
+      const rows: Array<{
+        id: string;
+        title: string;
+        recipeId: string | null;
+        nutrition: MacroNutrition;
+        alternatives: Array<{ recipeId: string; title: string }>;
+      }> = [];
+
+      for (const m of dayMeals) {
+        if (m.id === mealIdToReplace) {
+          rows.push({
+            id: m.id,
+            title: recipe.title,
+            recipeId: body.recipeId,
+            nutrition: newNutrition,
+            alternatives: newAlts,
+          });
+          continue;
+        }
+        const slot: MealSlot = {
+          dayIndex: m.dayIndex,
+          mealType: m.mealType,
+          scheduledAt: m.scheduledAt.toISOString(),
+          title: m.title,
+        };
+        const assigned = await this.generation.assignRecipeToSlot(
+          slot,
+          built.prefs,
+        );
+        rows.push({
+          id: m.id,
+          title: assigned.title,
+          recipeId: assigned.recipeId ?? null,
+          nutrition: assigned.nutrition,
+          alternatives: assigned.alternatives,
+        });
+      }
+
+      const balanced = rows.map((row) => ({
+        id: row.id,
+        nutrition: row.nutrition,
+      }));
+      balancePlannedMealRows(balanced, built.prefs);
+
+      await this.prisma.$transaction(
+        rows.map((row, idx) => {
+          const data =
+            row.id === mealIdToReplace
+              ? {
+                  title: row.title,
+                  recipeId: row.recipeId,
+                  nutrition: balanced[idx].nutrition as unknown as Prisma.InputJsonValue,
+                  alternatives: row.alternatives as unknown as Prisma.InputJsonValue,
+                  eatenAt: null,
+                }
+              : {
+                  title: row.title,
+                  recipeId: row.recipeId,
+                  nutrition: balanced[idx].nutrition as unknown as Prisma.InputJsonValue,
+                  alternatives: row.alternatives as unknown as Prisma.InputJsonValue,
+                };
+          return this.prisma.plannedMeal.update({
+            where: { id: row.id },
+            data,
+          });
+        }),
+      );
+    } else {
+      await this.prisma.plannedMeal.update({
+        where: { id: mealIdToReplace },
+        data: {
+          recipeId: body.recipeId,
+          title: recipe.title,
+          nutrition: newNutrition as unknown as Prisma.InputJsonValue,
+          alternatives: newAlts as unknown as Prisma.InputJsonValue,
+          eatenAt: null,
+        },
+      });
+    }
+
+    await this.resyncVersionNutritionLogs(versionId, userId);
+    const version = await this.getVersion(versionId, userId);
+    return {
+      version,
+      replanDay: Boolean(body.replanDay),
+      evaluation,
+    };
+  }
+
+  private async buildReplaceMealPreview(
+    versionId: string,
+    userId: string,
+    mealId: string,
+    recipeId: string,
+    servingsInput: number,
+  ) {
+    const meal = await this.prisma.plannedMeal.findFirst({
+      where: { id: mealId, versionId },
+    });
+    if (!meal) throw new NotFoundException('Meal not found');
+
+    const recipe = await this.prisma.recipe.findUnique({
+      where: { id: recipeId },
+    });
+    if (!recipe) throw new NotFoundException('Recipe not found');
+
+    const version = await this.prisma.mealPlanVersion.findUnique({
+      where: { id: versionId },
+    });
+    const prefs =
+      (version?.preferencesSnapshot as Record<string, unknown> | null) ??
+      (await this.generation.buildPrefsFromProfile(userId));
+
+    const servings = Math.max(0.25, Math.min(10, servingsInput));
+    const scaled =
+      await this.nutritionTools.scaleRecipeNutritionViaFunctionCall(
+        recipeId,
+        servings,
+      );
+    const newNutrition = normalizeNutrition(scaled.nutrition);
+
+    const alts = Array.isArray(meal.alternatives)
+      ? (meal.alternatives as Array<{ recipeId: string; title: string }>)
+      : [];
+    const newAlts = [
+      ...(meal.recipeId
+        ? [{ recipeId: meal.recipeId, title: meal.title }]
+        : []),
+      ...alts.filter((a) => a.recipeId !== recipeId),
+    ].slice(0, 4);
+
+    const dayMeals = await this.prisma.plannedMeal.findMany({
+      where: { versionId, dayIndex: meal.dayIndex },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const projectedTotals = sumMealNutrition(
+      dayMeals.map((m) => ({
+        nutrition:
+          m.id === mealId
+            ? newNutrition
+            : normalizeNutrition(m.nutrition as Partial<MacroNutrition>),
+      })),
+    );
+
+    const combined = await this.nutrition.getCombinedProfile(userId);
+    const macroTargets = combined.nutritionProfile?.macroTargets as
+      | Partial<MacroNutrition>
+      | null
+      | undefined;
+
+    const evaluation = evaluateDayAgainstTargets(
+      projectedTotals,
+      prefs,
+      macroTargets,
+    );
+
+    return {
+      meal,
+      recipe,
+      prefs,
+      newNutrition,
+      newAlts,
+      dayMeals,
+      projectedTotals,
+      macroTargets: macroTargets ?? null,
+      calorieTarget: dailyCalorieTarget(prefs),
+      evaluation,
+    };
   }
 
   async regenerateMeal(versionId: string, userId: string, mealId: string) {

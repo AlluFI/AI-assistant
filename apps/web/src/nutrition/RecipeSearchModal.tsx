@@ -6,6 +6,7 @@ import { RecipeNutritionViz } from './RecipeNutritionViz'
 import type { EnhancedRecipeNutrition } from './types'
 import { formatDietaryTags, formatPreparationStep } from './recipeDisplay'
 import { apiGet, apiPost } from '../lib/apiClient'
+import { RecipeMealSwapPanel } from './RecipeMealSwapPanel'
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const
 const CUISINES = [
   'Italian',
@@ -78,7 +79,10 @@ type Props = {
   accessToken: string
   isOpen: boolean
   onClose: () => void
+  activePlanId?: string | null
+  onMealPlanChanged?: () => void
   profileRestrictions?: string[]
+  setMessage?: (v: string) => void
   setError: (v: string) => void
 }
 
@@ -86,10 +90,13 @@ export function RecipeSearchModal({
   accessToken,
   isOpen,
   onClose,
+  activePlanId = null,
+  onMealPlanChanged,
   profileRestrictions = [],
+  setMessage = () => {},
   setError,
 }: Props) {
-  const [view, setView] = useState<'search' | 'detail'>('search')
+  const [view, setView] = useState<'search' | 'detail' | 'swap'>('search')
   const [query, setQuery] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [meal, setMeal] = useState('')
@@ -147,7 +154,9 @@ export function RecipeSearchModal({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (view === 'detail') {
+        if (view === 'swap') {
+          setView('detail')
+        } else if (view === 'detail') {
           setView('search')
           resetDetail()
         } else {
@@ -544,6 +553,35 @@ export function RecipeSearchModal({
               ))}
             </ul>
           </>
+        ) : view === 'swap' && recipe ? (
+          <>
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 0 }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setView('detail')}
+              >
+                ← Back to recipe
+              </button>
+              <h2 id="recipe-search-title" style={{ margin: 0 }}>
+                Swap into plan
+              </h2>
+            </div>
+            <RecipeMealSwapPanel
+              accessToken={accessToken}
+              activePlanId={activePlanId}
+              recipeId={recipe.id}
+              recipeTitle={recipe.title}
+              servings={servings}
+              onDone={() => {
+                onMealPlanChanged?.()
+                setView('detail')
+              }}
+              onCancel={() => setView('detail')}
+              setMessage={setMessage}
+              setError={setError}
+            />
+          </>
         ) : (
           <>
             <div className="row" style={{ justifyContent: 'space-between', marginTop: 0 }}>
@@ -580,6 +618,9 @@ export function RecipeSearchModal({
                       }}
                     />
                   </label>
+                  <button type="button" onClick={() => setView('swap')}>
+                    Swap into meal plan
+                  </button>
                 </div>
                 <p className="hint">
                   {recipe.cuisine} · {recipe.meal} · {recipe.time} min · base serves{' '}

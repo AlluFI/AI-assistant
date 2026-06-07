@@ -1,4 +1,4 @@
-import { MacroNutrition, scaleMacros } from '../shared/units';
+import { MacroNutrition, addMacros, scaleMacros } from '../shared/units';
 import type { MealPlanPreferences } from './meal-plans.types';
 
 export function dailyCalorieTarget(prefs: MealPlanPreferences): number {
@@ -76,6 +76,72 @@ export function fitNutritionToTarget(
   const base = Math.max(perServing.calories, 1);
   const portion = Math.min(2.5, Math.max(0.2, targetCalories / base));
   return scaleMacros(perServing, portion);
+}
+
+export function sumMealNutrition(
+  meals: Array<{ nutrition: MacroNutrition }>,
+): MacroNutrition {
+  return meals.reduce(
+    (acc, m) => addMacros(acc, normalizeNutrition(m.nutrition)),
+    { calories: 0, protein: 0, carbs: 0, fats: 0 },
+  );
+}
+
+export type DayTargetEvaluation = {
+  needsReplanWarning: boolean;
+  calorieDirection: 'over' | 'under' | 'ok';
+  calorieDelta: number;
+  calorieTarget: number;
+  macroDeltas: { protein: number; carbs: number; fats: number } | null;
+};
+
+/** True when swap-only would leave the day materially off calorie or macro targets. */
+export function evaluateDayAgainstTargets(
+  totals: MacroNutrition,
+  prefs: MealPlanPreferences,
+  macroTargets?: Partial<MacroNutrition> | null,
+): DayTargetEvaluation {
+  const calorieTarget = dailyCalorieTarget(prefs);
+  const calorieDelta = totals.calories - calorieTarget;
+  const calorieThreshold = Math.max(50, Math.round(calorieTarget * 0.05));
+  let needsReplanWarning = Math.abs(calorieDelta) > calorieThreshold;
+
+  let macroDeltas: DayTargetEvaluation['macroDeltas'] = null;
+  if (
+    macroTargets &&
+    (macroTargets.protein != null ||
+      macroTargets.carbs != null ||
+      macroTargets.fats != null)
+  ) {
+    macroDeltas = {
+      protein: totals.protein - Number(macroTargets.protein ?? 0),
+      carbs: totals.carbs - Number(macroTargets.carbs ?? 0),
+      fats: totals.fats - Number(macroTargets.fats ?? 0),
+    };
+    for (const [key, delta] of Object.entries(macroDeltas)) {
+      const target = Number(macroTargets[key as keyof MacroNutrition] ?? 0);
+      if (target <= 0) continue;
+      const macroThreshold = Math.max(8, target * 0.12);
+      if (Math.abs(delta) > macroThreshold) {
+        needsReplanWarning = true;
+      }
+    }
+  }
+
+  const calorieDirection: DayTargetEvaluation['calorieDirection'] =
+    Math.abs(calorieDelta) <= calorieThreshold
+      ? 'ok'
+      : calorieDelta > 0
+        ? 'over'
+        : 'under';
+
+  return {
+    needsReplanWarning,
+    calorieDirection,
+    calorieDelta,
+    calorieTarget,
+    macroDeltas,
+  };
 }
 
 export function newMealPlanId(): string {

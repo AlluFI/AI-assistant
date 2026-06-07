@@ -3,6 +3,7 @@ import { NutritionCharts } from './NutritionCharts'
 import { MealPhotoLog } from './MealPhotoLog'
 import { NutritionInsightsSection } from './NutritionInsightsSection'
 import { MealPlanDetail } from './MealPlanDetail'
+import { PastMealPlansModal } from './PastMealPlansModal'
 import { RecipeCommunityPanel } from './RecipeCommunityPanel'
 import { RecipeSearchModal } from './RecipeSearchModal'
 import { ShoppingListPanel } from './ShoppingListPanel'
@@ -82,6 +83,7 @@ export function NutritionPanel({
   const [weeklyAnalytics, setWeeklyAnalytics] = useState<WeeklyAnalytics | null>(null)
   const [mealPlans, setMealPlans] = useState<MealPlanListItem[]>([])
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [mealPlanRefreshKey, setMealPlanRefreshKey] = useState(0)
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [duration, setDuration] = useState<'daily' | 'weekly'>('daily')
   const [dailyAnalytics, setDailyAnalytics] = useState<DailyAnalytics | null>(null)
@@ -91,6 +93,7 @@ export function NutritionPanel({
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [shoppingModalOpen, setShoppingModalOpen] = useState(false)
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false)
+  const [pastPlansModalOpen, setPastPlansModalOpen] = useState(false)
   const [insights, setInsights] = useState<NutritionInsights | null>(null)
   const [targetRationale, setTargetRationale] = useState<string | null>(null)
 
@@ -168,7 +171,11 @@ export function NutritionPanel({
       const body = await apiGet<MealPlanListItem[]>('/meal-plans', accessToken)
       if (Array.isArray(body)) {
         setMealPlans(body)
-        setSelectedPlanId((prev) => prev ?? body[0]?.id ?? null)
+        const activeToday = body.filter((p) => p.coversToday)
+        setSelectedPlanId((prev) => {
+          if (prev && activeToday.some((p) => p.id === prev)) return prev
+          return activeToday[0]?.id ?? null
+        })
       }
     } catch {
       /* keep previous list */
@@ -386,6 +393,11 @@ export function NutritionPanel({
   const healthRestrictions = profile?.healthProfile?.dietaryRestrictions ?? []
   const profileRestrictionTags = useMemo(() => [...healthRestrictions], [healthRestrictions])
 
+  const activePlansToday = useMemo(
+    () => mealPlans.filter((p) => p.coversToday),
+    [mealPlans],
+  )
+
   const refreshAnalytics = async () => {
     await loadDailyAnalytics()
     await loadWeeklyAnalytics()
@@ -518,6 +530,17 @@ export function NutritionPanel({
 
       <section className="card cardWide">
         <h2>Generate meal plan</h2>
+        {activePlansToday.length === 0 ? (
+          <p className="hint mealPlanTodayEmpty">
+            No meal plan for today. Generate a new plan below, or browse past plans in{' '}
+            <strong>Meal plan detail</strong> to re-apply an older one.
+          </p>
+        ) : (
+          <p className="hint">
+            Active for today:{' '}
+            {activePlansToday.map((p) => `${p.duration} (${p.startDate})`).join(', ')}
+          </p>
+        )}
         <div className="row">
           <label>
             Start date
@@ -537,7 +560,7 @@ export function NutritionPanel({
             type="button"
             className="secondary"
             onClick={() => void generateMealPlan(true)}
-            disabled={busy || !selectedPlanId}
+            disabled={busy || !selectedPlanId || !activePlansToday.some((p) => p.id === selectedPlanId)}
             title="Create a new plan version using current preferences"
           >
             Regenerate plan
@@ -556,7 +579,7 @@ export function NutritionPanel({
       <MealPlanDetail
         accessToken={accessToken}
         planId={selectedPlanId}
-        plans={mealPlans}
+        plans={activePlansToday}
         busy={busy}
         setBusy={setBusy}
         setMessage={setMessage}
@@ -572,6 +595,8 @@ export function NutritionPanel({
           setShoppingModalOpen(true)
           void loadShoppingLists()
         }}
+        onOpenPastPlans={() => setPastPlansModalOpen(true)}
+        refreshKey={mealPlanRefreshKey}
       />
 
       <RecipeCommunityPanel
@@ -614,8 +639,31 @@ export function NutritionPanel({
         accessToken={accessToken}
         isOpen={recipeSearchOpen}
         onClose={() => setRecipeSearchOpen(false)}
+        activePlanId={activePlansToday[0]?.id ?? selectedPlanId}
+        onMealPlanChanged={() => {
+          void loadMealPlans()
+          void refreshAnalytics()
+          setMealPlanRefreshKey((k) => k + 1)
+        }}
         profileRestrictions={profileRestrictionTags}
+        setMessage={setMessage}
         setError={setError}
+      />
+
+      <PastMealPlansModal
+        accessToken={accessToken}
+        isOpen={pastPlansModalOpen}
+        onClose={() => setPastPlansModalOpen(false)}
+        onReapplied={(planId) => {
+          setSelectedPlanId(planId)
+          void loadMealPlans()
+          void refreshAnalytics()
+          setMealPlanRefreshKey((k) => k + 1)
+        }}
+        setMessage={setMessage}
+        setError={setError}
+        setBusy={setBusy}
+        busy={busy}
       />
     </div>
   )

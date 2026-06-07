@@ -1,6 +1,7 @@
 import {
   balanceDayNutrition,
   dailyCalorieTarget,
+  evaluateDayAgainstTargets,
   fitNutritionToTarget,
   normalizeNutrition,
   scaleMealsToDailyTarget,
@@ -106,6 +107,28 @@ describe('meal-plan-nutrition.util', () => {
       );
       expect(scaled.calories).toBeGreaterThan(400);
       expect(scaled.calories).toBeLessThanOrEqual(1000);
+    });
+  });
+
+  describe('evaluateDayAgainstTargets', () => {
+    it('warns when calories exceed target by more than threshold', () => {
+      const result = evaluateDayAgainstTargets(
+        { calories: 2400, protein: 120, carbs: 200, fats: 80 },
+        { calorie_target: 2000 } as MealPlanPreferences,
+        { protein: 150, carbs: 200, fats: 65 },
+      );
+      expect(result.needsReplanWarning).toBe(true);
+      expect(result.calorieDirection).toBe('over');
+    });
+
+    it('does not warn when within calorie tolerance', () => {
+      const result = evaluateDayAgainstTargets(
+        { calories: 1980, protein: 140, carbs: 190, fats: 60 },
+        { calorie_target: 2000 } as MealPlanPreferences,
+        { protein: 150, carbs: 200, fats: 65 },
+      );
+      expect(result.needsReplanWarning).toBe(false);
+      expect(result.calorieDirection).toBe('ok');
     });
   });
 });

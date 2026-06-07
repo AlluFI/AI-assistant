@@ -23,6 +23,13 @@ type Props = {
   setError: (v: string) => void
 }
 
+const MEAL_TYPES = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+  { value: 'snack', label: 'Snack' },
+] as const
+
 export function QuickFoodLogPanel({
   accessToken,
   busy,
@@ -137,14 +144,20 @@ export function QuickFoodLogPanel({
   const disabled = busy || saving
 
   return (
-    <section className="card quickFoodLog">
-      <h2>Quick food log</h2>
-      <p className="hint">Log food outside your meal plan — macros come from the nutrition database.</p>
+    <section className="card todayActionCard quickFoodLog">
+      <header className="todayActionHead">
+        <h2>Quick food log</h2>
+        <p className="hint">
+          Log food outside your meal plan — macros come from the nutrition database.
+        </p>
+      </header>
 
-      <div className="chipRow">
+      <div className="todaySegmented" role="tablist" aria-label="Log type">
         <button
           type="button"
-          className={mode === 'recipe' ? '' : 'secondary'}
+          role="tab"
+          aria-selected={mode === 'recipe'}
+          className={mode === 'recipe' ? 'active' : ''}
           onClick={() => setMode('recipe')}
           disabled={disabled}
         >
@@ -152,7 +165,9 @@ export function QuickFoodLogPanel({
         </button>
         <button
           type="button"
-          className={mode === 'ingredient' ? '' : 'secondary'}
+          role="tab"
+          aria-selected={mode === 'ingredient'}
+          className={mode === 'ingredient' ? 'active' : ''}
           onClick={() => setMode('ingredient')}
           disabled={disabled}
         >
@@ -160,105 +175,120 @@ export function QuickFoodLogPanel({
         </button>
       </div>
 
-      <div className="formGrid">
-        <label>
-          Title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} disabled={disabled} />
-        </label>
-        <label>
-          Meal type
-          <select value={mealType} onChange={(e) => setMealType(e.target.value)} disabled={disabled}>
-            <option value="breakfast">breakfast</option>
-            <option value="lunch">lunch</option>
-            <option value="dinner">dinner</option>
-            <option value="snack">snack</option>
-          </select>
-        </label>
-      </div>
-
-      {mode === 'recipe' ? (
-        <>
-          <label>
-            Search recipes
+      <div className="todayActionForm">
+        <div className="todayFieldRow">
+          <label className="todayField">
+            <span className="todayFieldLabel">Title</span>
             <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setRecipeId('')
-              }}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               disabled={disabled}
-              placeholder="e.g. chicken salad"
+              placeholder="Optional display name"
             />
           </label>
-          {hits.length > 0 ? (
-            <ul className="quickLogHits">
-              {hits.map((r) => (
+          <label className="todayField">
+            <span className="todayFieldLabel">Meal type</span>
+            <select
+              value={mealType}
+              onChange={(e) => setMealType(e.target.value)}
+              disabled={disabled}
+            >
+              {MEAL_TYPES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {mode === 'recipe' ? (
+          <>
+            <label className="todayField">
+              <span className="todayFieldLabel">Search recipes</span>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setRecipeId('')
+                }}
+                disabled={disabled}
+                placeholder="e.g. chicken salad"
+                autoComplete="off"
+              />
+            </label>
+            {hits.length > 0 ? (
+              <ul className="todaySearchHits" role="listbox" aria-label="Recipe matches">
+                {hits.map((r) => (
+                  <li key={r.id}>
+                    <button type="button" onClick={() => selectRecipe(r)} disabled={disabled}>
+                      <span className="todaySearchHitTitle">{r.title}</span>
+                      {r.nutrition?.calories != null ? (
+                        <span className="todaySearchHitMeta">{r.nutrition.calories} kcal</span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <label className="todayField todayFieldNarrow">
+              <span className="todayFieldLabel">Servings</span>
+              <input
+                type="number"
+                min={0.25}
+                step={0.25}
+                value={servings}
+                onChange={(e) => setServings(e.target.value)}
+                disabled={disabled}
+              />
+            </label>
+          </>
+        ) : (
+          <div className="todayFieldRow">
+            <label className="todayField">
+              <span className="todayFieldLabel">Ingredient</span>
+              <input
+                value={ingredientName}
+                onChange={(e) => setIngredientName(e.target.value)}
+                disabled={disabled}
+                placeholder="e.g. banana"
+              />
+            </label>
+            <label className="todayField todayFieldNarrow">
+              <span className="todayFieldLabel">Amount (g)</span>
+              <input
+                type="number"
+                min={1}
+                value={ingredientQty}
+                onChange={(e) => setIngredientQty(e.target.value)}
+                disabled={disabled}
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="todayActionFooter">
+          <button type="button" onClick={() => void logManual()} disabled={disabled}>
+            Log food
+          </button>
+        </div>
+
+        {recent.length > 0 ? (
+          <div className="todayRecentBlock">
+            <h3 className="todayRecentTitle">Recent logs</h3>
+            <ul className="todayRecentList">
+              {recent.map((r) => (
                 <li key={r.id}>
-                  <button type="button" className="secondary" onClick={() => selectRecipe(r)}>
-                    {r.title}
-                    {r.nutrition?.calories != null ? ` · ${r.nutrition.calories} kcal` : ''}
-                  </button>
+                  <span className="todayRecentName">{r.title}</span>
+                  {r.nutrition?.calories != null ? (
+                    <span className="todayRecentMeta">{r.nutrition.calories} kcal</span>
+                  ) : null}
                 </li>
               ))}
             </ul>
-          ) : null}
-          <label>
-            Servings
-            <input
-              type="number"
-              min={0.25}
-              step={0.25}
-              value={servings}
-              onChange={(e) => setServings(e.target.value)}
-              disabled={disabled}
-            />
-          </label>
-        </>
-      ) : (
-        <div className="formGrid">
-          <label>
-            Ingredient
-            <input
-              value={ingredientName}
-              onChange={(e) => setIngredientName(e.target.value)}
-              disabled={disabled}
-              placeholder="e.g. banana"
-            />
-          </label>
-          <label>
-            Amount (g)
-            <input
-              type="number"
-              min={1}
-              value={ingredientQty}
-              onChange={(e) => setIngredientQty(e.target.value)}
-              disabled={disabled}
-            />
-          </label>
-        </div>
-      )}
-
-      <div className="row">
-        <button type="button" onClick={() => void logManual()} disabled={disabled}>
-          Log food
-        </button>
+          </div>
+        ) : null}
       </div>
-
-      {recent.length > 0 ? (
-        <>
-          <h3 className="quickLogRecentTitle">Recent logs</h3>
-          <ul className="quickLogHits">
-            {recent.map((r) => (
-              <li key={r.id}>
-                <span>
-                  {r.title}
-                  {r.nutrition?.calories != null ? ` · ${r.nutrition.calories} kcal` : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
     </section>
   )
 }

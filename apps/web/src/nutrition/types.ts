@@ -124,6 +124,10 @@ export type MealPlanListItem = {
   id: string
   duration: string
   startDate: string
+  endDate?: string
+  coversToday?: boolean
+  isExpired?: boolean
+  updatedAt?: string
   versions?: Array<{
     id: string
     versionLabel: string

@@ -15,6 +15,11 @@ import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-anal
 import { RecipesService } from '../recipes/recipes.service';
 import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
 import {
+  dayIndexForPlanDate,
+  dateForPlanDay,
+  planCoversDate,
+} from '../shared/meal-plan-date.util';
+import {
   averageCheckInScore,
   dayCheckInScore,
 } from '../analytics/check-in-wellness.util';
@@ -260,7 +265,10 @@ export class AssistantToolsService {
     });
 
     const plan = plans.find(
-      (row) => !isHiddenDemoMealPlanId(row.id) && row.versions[0],
+      (row) =>
+        !isHiddenDemoMealPlanId(row.id) &&
+        row.versions[0] &&
+        planCoversDate(row.startDate, row.duration, date),
     );
 
     if (!plan?.versions[0]) {
@@ -279,7 +287,7 @@ export class AssistantToolsService {
       const planDayCount = 7;
       const days = [];
       for (let dayIndex = 0; dayIndex < planDayCount; dayIndex += 1) {
-        const date = this.dateForPlanDay(plan.startDate, dayIndex);
+        const date = dateForPlanDay(plan.startDate, dayIndex);
         const dayMeals = allMeals
           .filter((m) => m.dayIndex === dayIndex)
           .map((m) => this.mapPlannedMeal(m));
@@ -303,7 +311,7 @@ export class AssistantToolsService {
         versionId: version.id,
         duration: plan.duration,
         startDate: plan.startDate,
-        endDate: this.dateForPlanDay(plan.startDate, planDayCount - 1),
+        endDate: dateForPlanDay(plan.startDate, planDayCount - 1),
         dayCount: planDayCount,
         days,
         missingDayIndexes,
@@ -311,7 +319,7 @@ export class AssistantToolsService {
       };
     }
 
-    const dayIndex = this.dayIndexForDate(plan.startDate, date, plan.duration);
+    const dayIndex = dayIndexForPlanDate(plan.startDate, date, plan.duration);
     const meals = allMeals
       .filter((m) => m.dayIndex === dayIndex)
       .map((m) => this.mapPlannedMeal(m));
@@ -877,24 +885,6 @@ export class AssistantToolsService {
       intake: daily.intake,
       target: daily.target.macros,
     };
-  }
-
-  private dateForPlanDay(startDate: string, dayIndex: number): string {
-    const d = new Date(`${startDate}T12:00:00.000Z`);
-    d.setUTCDate(d.getUTCDate() + dayIndex);
-    return d.toISOString().slice(0, 10);
-  }
-
-  private dayIndexForDate(
-    startDate: string,
-    targetDate: string,
-    duration: string,
-  ): number {
-    if (duration === 'daily') return 0;
-    const start = new Date(`${startDate}T12:00:00.000Z`);
-    const target = new Date(`${targetDate}T12:00:00.000Z`);
-    const diff = Math.round((target.getTime() - start.getTime()) / 86400000);
-    return Math.max(0, Math.min(6, diff));
   }
 
   private enumArg(

@@ -5,7 +5,7 @@ import { weeklyActiveDaysFromLogs } from '../analytics/activity-week.util';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
 import { NutritionService } from '../nutrition/nutrition.service';
-import { dayIndexForPlanDate } from '../shared/meal-plan-date.util';
+import { dayIndexForPlanDate, planCoversDate } from '../shared/meal-plan-date.util';
 import type { MacroNutrition } from '../shared/units';
 import {
   computeAdherence,
@@ -100,7 +100,10 @@ export class TodayService {
     });
 
     const plan = plans.find(
-      (p) => !isHiddenDemoMealPlanId(p.id) && p.versions[0],
+      (p) =>
+        !isHiddenDemoMealPlanId(p.id) &&
+        p.versions[0] &&
+        planCoversDate(p.startDate, p.duration, today),
     );
     if (!plan?.versions[0]) return null;
 

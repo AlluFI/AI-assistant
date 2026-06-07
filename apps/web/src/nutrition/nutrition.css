@@ -242,6 +242,61 @@
   margin-bottom: 1rem;
 }
 
+.mealPlanDetailHeadActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.mealPlanTodayEmpty {
+  margin-bottom: 0.75rem;
+}
+
+.pastMealPlansModal label {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.pastMealPlansList {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.pastMealPlanRow {
+  margin: 0;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.pastMealPlanRow.selected .pastMealPlanSelect {
+  background: rgba(99, 179, 237, 0.12);
+}
+
+.pastMealPlanSelect {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.65rem 0.5rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pastMealPlanReapply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
 .mealPlanMeta {
   flex-wrap: wrap;
   align-items: center;
@@ -1028,4 +1083,147 @@
   margin: 0.35rem 0 0.5rem;
   padding-left: 1.1rem;
   font-size: 0.9rem;
+}
+
+/* Recipe search → meal plan swap */
+.recipeSwapPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.recipeSwapTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.recipeSwapSectionLabel,
+.recipeSwapPreviewLabel {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.recipeSwapDayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.recipeSwapDayRow button {
+  min-width: 3rem;
+}
+
+.recipeSwapDayLabel {
+  margin: 0;
+}
+
+.recipeSwapMealList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.recipeSwapMealOption {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.recipeSwapMealOption:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.recipeSwapMealOption.selected {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-soft));
+}
+
+.recipeSwapMealType {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.recipeSwapMealTitle {
+  font-weight: 600;
+}
+
+.recipeSwapPreview {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.recipeSwapPreview p {
+  margin: 0.25rem 0 0;
+}
+
+.recipeSwapDelta.over {
+  color: #dc2626;
+}
+
+.recipeSwapDelta.under {
+  color: #d97706;
+}
+
+:root[data-theme='dark'] .recipeSwapDelta.over {
+  color: #fca5a5;
+}
+
+:root[data-theme='dark'] .recipeSwapDelta.under {
+  color: #fcd34d;
+}
+
+.recipeSwapActions {
+  margin-top: 0.25rem;
+}
+
+.recipeSwapConfirmBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 55%);
+  backdrop-filter: blur(2px);
+}
+
+.recipeSwapConfirmDialog {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  box-shadow: 0 12px 40px rgb(15 23 42 / 18%);
+}
+
+.recipeSwapConfirmDialog h4 {
+  margin: 0 0 0.5rem;
 }

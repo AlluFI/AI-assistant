@@ -882,6 +882,387 @@
   min-width: 0;
 }
 
+/* Quick food log + daily check-in — aligned with Today dashboard stat cards */
+.todayActionsRow {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 820px) {
+  .todayActionsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+.todayActionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1.35rem 1.5rem;
+}
+
+.todayActionCard h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.todayActionHead {
+  margin-bottom: 1rem;
+}
+
+.todayActionHead .hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.todayActionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.todaySegmented {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.todaySegmented button {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  background: transparent;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.todaySegmented button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.todaySegmented button.active {
+  color: var(--text);
+  background: var(--bg-elev);
+  box-shadow: 0 1px 4px rgb(15 23 42 / 12%);
+}
+
+:root[data-theme='dark'] .todaySegmented button.active {
+  box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
+}
+
+.todayFieldRow {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .todayFieldRow {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+.todayField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.todayFieldNarrow {
+  max-width: 8rem;
+}
+
+.todayFieldLabel,
+.todayMetricLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--muted);
+}
+
+.todayActionCard input,
+.todayActionCard select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.todayActionCard input::placeholder {
+  color: color-mix(in srgb, var(--muted) 85%, transparent);
+}
+
+.todayActionCard input:focus-visible,
+.todayActionCard select:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.todayMetricGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.todayMetricField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: var(--radius, 0.65rem);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  min-width: 0;
+}
+
+.todayMetricFieldMood {
+  grid-column: 1 / -1;
+}
+
+.todayMetricUnit {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.todayMetricField input {
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.todayMetricField input:focus-visible {
+  box-shadow: none;
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.todayMoodRow {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.todayMoodRow button {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.todayMoodRow button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border-strong));
+}
+
+.todayMoodRow button.active {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong));
+  background: color-mix(in srgb, var(--primary) 18%, var(--bg-elev));
+  color: var(--primary);
+}
+
+:root[data-theme='dark'] .todayMoodRow button.active {
+  color: var(--text);
+}
+
+.todayActionFooter {
+  display: flex;
+  margin-top: 0.15rem;
+}
+
+.todayActionFooter button {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+}
+
+.todayActionNote {
+  margin: -0.35rem 0 0;
+}
+
+.todaySearchHits {
+  list-style: none;
+  margin: -0.35rem 0 0;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.todaySearchHits li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.todaySearchHits li button:hover:not(:disabled) {
+  background: var(--bg-elev);
+}
+
+.todaySearchHitTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todaySearchHitMeta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.todayRecentBlock {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.todayRecentTitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--muted);
+}
+
+.todayRecentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.todayRecentList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.45rem;
+  background: var(--bg-soft);
+  font-size: 0.88rem;
+}
+
+.todayRecentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todayRecentMeta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.todayCollapsible {
+  margin-top: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+
+.todayCollapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.75rem 0.9rem;
+  list-style: none;
+  user-select: none;
+}
+
+.todayCollapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+.todayCollapsible summary::after {
+  content: '+';
+  float: right;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.todayCollapsible[open] summary::after {
+  content: '−';
+}
+
+.todayCollapsibleBody {
+  padding: 0 0.9rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.todayCollapsibleBody .hint {
+  margin: 0.75rem 0 0;
+}
+
+/* Legacy class names — keep for any stale references */
 .quickLogHits {
   list-style: none;
   margin: 0.5rem 0 0;
