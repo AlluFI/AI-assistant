@@ -106,3 +106,166 @@ Use **`docs/PROMPT_EXAMPLES.md`** as the reference answer shape. After each Wing
 | Safety | Chest pain when exercising? | § Safety / static handler | Urgent care; no diagnosis |
 | General wellness | How can I improve my sleep? | §6 | Lifestyle tips + clinician disclaimer |
 
+---
+
+## Extra testing criteria — context, performance & topic handling
+
+From [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md) → Testing → Extra. Status in [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md): history compression ✅; dynamic topic context 🟡; efficient fetching ✅ (tool-scoped + bounded queries).
+
+### Architecture (where to look)
+
+| Mechanism | File | Role |
+|-----------|------|------|
+| Token-budget trim (drops **oldest** turns) | **`apps/api/src/assistant/wingman-context.util.ts`** | `buildTokenAwareHistory`, `trimHistoryToTokenBudget` |
+| Thread summary (≤500 chars, from **8+** msgs) | **`apps/api/src/assistant/thread-summary.service.ts`** | LLM compress (`ASSISTANT_SUMMARY_MODE=llm`) or rule fallback |
+| Summary injected into prompt | **`apps/api/src/assistant/assistant-wingman.service.ts`** → `buildLlmContext` | `## Thread memory (this conversation)` on system prompt |
+| Long-term preferences (cross-session) | **`apps/api/src/assistant/user-memory.service.ts`** | Async facts/constraints; see **`docs/LONG_TERM_MEMORY.md`** |
+| Coaching mode bias (manual, not auto) | **`apps/api/src/assistant/prompts/coaching-mode.ts`** | `balanced` / `nutrition` / `wellness` / `onboarding` |
+| Answer scope (reply focus, not history router) | **`apps/api/src/assistant/prompts/system-prompt.ts`** | “Answer only what the user asked” |
+
+**Env (repo root `.env` / `.env.example`):**
+
+```env
+ASSISTANT_CONTEXT_TOKEN_BUDGET=12000   # lower to ~3000 for visible trim in demo
+ASSISTANT_CONTEXT_REPLY_RESERVE=2500
+ASSISTANT_CONTEXT_MIN_TURNS=4
+ASSISTANT_CONTEXT_MAX_MESSAGES=120
+ASSISTANT_SUMMARY_MODE=llm
+ASSISTANT_MEMORY_ENABLED=true
+ASSISTANT_MEMORY_MIN_NEW_MESSAGES=4
+```
+
+---
+
+### Criterion: compress history when approaching token limits
+
+| Criterion | How to verify (this repo) |
+|--------|-------------------------------|
+| System automatically compresses conversation history into concise summaries when approaching token limits | **Two layers:** (1) **Trim** — when estimated tokens exceed budget, oldest turns are dropped (`wingman-context.util.ts`); trigger also fires summary if none exists yet (`buildLlmContext`: `droppedTurns > 0 && !summary`). (2) **Summarize** — from **8+ messages**, `ThreadSummaryService.maybeUpdate` runs after each reply; LLM prompt in **`wingman-llm.facade.ts`** → `summarizeConversation` (“2–3 short sentences… goals, metrics, open questions”). Summary stored on `AssistantThread.summary`, injected on the **next** turn. **Demo tip:** default budget **12000** may not drop turns in a normal 10-turn chat — temporarily set **`ASSISTANT_CONTEXT_TOKEN_BUDGET=3000`**, restart API, then run 10+ turns with moderately long messages. |
+| Conduct 10+ turn conversation; examine earlier turns; verify key user info/constraints/preferences remain available | **Setup:** In turn 1–2 state something distinctive: *“I'm vegetarian and allergic to nuts — remember that.”* Continue 8+ more turns (meal plan, protein, weight, etc.). **Inspect:** `GET /api/assistant/threads/:id` → `summary` field populated after message 8+. **Recall test:** Ask *“What dietary restrictions did I mention?”* or plan a meal — assistant should reflect constraint via summary and/or **Memory** panel (`GET /api/assistant/memory`). **Honest limits:** summary is async (may appear one message late); max **500** chars; rule fallback is only `Recent topics: …` if LLM fails; long-term memory consolidates after **4+** new user messages — not instant on turn 2. Profile restrictions also live in DB and tools regardless of chat memory. |
+
+**Suggested 10+ turn script:**
+
+| Turn | User message (example) |
+|------|------------------------|
+| 1 | I'm vegetarian and allergic to nuts — please remember that. |
+| 2 | What's my current BMI? |
+| 3 | What's on my meal plan today? |
+| 4 | Have I been getting enough protein this week? |
+| 5 | How close am I to my weight goal? |
+| 6 | Show my weight trend for the last month. |
+| 7 | What nutrients are in my breakfast today? |
+| 8 | Can you tell me more about that? |
+| 9 | How do I prepare tonight's dinner? |
+| 10 | Given my restrictions, suggest a high-protein snack. |
+| 11 | (Reviewer) What dietary restrictions did I mention at the start? |
+
+**Pass if:** turn 10–11 respects vegetarian/nut-free constraint; `summary` on thread mentions diet/allergy or Memory panel lists a `constraint`/`preference` fact.
+
+---
+
+### Criterion: dynamic context detail by current topic
+
+| Criterion | How to verify (this repo) |
+|--------|-------------------------------|
+| System adjusts context detail level dynamically based on relevance to the current conversation topic | **Partial (🟡).** No automatic topic router compresses “old topic” turns when the user switches domain. What exists: (1) **Answer scope** — model instructed not to dump unrelated profile sections; (2) **Coaching modes** — manual emphasis via `PATCH /api/assistant/threads/:id` `{ "coachingMode": "nutrition" \| "wellness" \| "balanced" }` or message body; (3) **Long-term memory** prompt — “use only when relevant”; (4) **Thread summary** — re-compresses last 20 messages holistically, not per-topic deprioritization. **Do not claim** automatic nutrition→exercise context switching unless demonstrating manual coaching mode change. |
+| After 10+ turns, shift topic (nutrition → exercise); examine context handling; student demonstrates adjustment | **Demo flow:** (1) Run nutrition-heavy turns (table above, turns 2–7). (2) Shift: *“Let's switch to exercise — what activity should I add for weight loss?”* (3) Show reply stays exercise-focused without re-listing full meal plan (Answer scope). (4) Optional — **`PATCH /api/assistant/threads/:id`** with `"coachingMode": "wellness"` → ask exercise question again; compare tool use (`get_health_metrics`, `get_progress_summary` vs `get_meal_plan`). (5) **Code walkthrough:** open `buildLlmContext` — show recent turns + summary + memory in system prompt; explain trim keeps **recent** turns, not topic-filtered subset. **Student talk track:** “Topic focus is prompt-guided and tool-driven; coaching mode is user-selectable; we don't drop nutrition turns automatically when exercise is asked — the model is instructed to answer the current question only.” |
+
+**Topic-shift script (after nutrition block):**
+
+| Turn | User message |
+|------|----------------|
+| 12 | Let's talk about exercise instead — what should I add for weight loss? |
+| 13 | How has my activity level looked lately? |
+| 14 | Can you tell me more about that? |
+
+**Pass if:** turns 12–14 focus on activity/progress (tools: `get_health_metrics` / `get_progress_summary`), without unsolicited full meal-plan recap. **Bonus demo:** switch `coachingMode` to `wellness` and repeat turn 12.
+
+---
+
+### Criterion: efficient data retrieval (no overfetch)
+
+| Criterion | How to verify (this repo) |
+|--------|-------------------------------|
+| The system demonstrates appropriate performance optimization by efficiently retrieving only necessary data rather than overfetching | **Design:** Wingman does **not** preload the full health profile, all meal plans, or all metrics on every message. The LLM calls **scoped tools** per question (`assistant-tool-definitions.ts`); execution in **`assistant-tools.service.ts`** returns shaped JSON, not raw Prisma dumps. **Context layer** (`buildLlmContext` in **`assistant-wingman.service.ts`**) uses narrow `select` (display name, thread summary, coaching mode only) and caps history fetch (`ASSISTANT_CONTEXT_MAX_MESSAGES`, default **120**). **Live:** inspect **`toolTraces`** on `POST /api/assistant/threads/:id/messages` — a BMI question should show **`get_health_metrics`** only, not every tool. Compare args/result size across questions (BMI vs week meal plan vs chart). **Code walkthrough:** table below. |
+
+#### Where fetching is bounded (file → behaviour)
+
+| Layer | File | What is limited |
+|-------|------|-----------------|
+| On-demand tools | **`system-prompt.ts`** | “Call tools whenever the user asks about their data” — no bulk preload |
+| Context load | **`assistant-wingman.service.ts`** → `buildLlmContext` | User: `select: { displayName }`; thread: `summary`, `coachingMode`; messages: `role`, `content`, `take: fetchLimit` |
+| Token trim | **`wingman-context.util.ts`** | Only recent turns sent to LLM after budget calc |
+| Thread summary | **`thread-summary.service.ts`** | Last **20** messages → ≤**500** char summary |
+| Long-term memory | **`user-memory.service.ts`** → `formatForPrompt` | Injected narrative + facts capped at **1200** chars |
+| Health metrics | **`assistant-tools.service.ts`** → `getHealthMetrics` | `time_period` sets lookback (**1** / **7** / **30** days); metrics list capped at **10**; `metric_type` other than `all` → **`pickMetrics`** returns subset fields only |
+| Meal plan | **`getMealPlan`** | Default **`scope: day`** → filters meals to one `dayIndex`; **`scope: week`** only when asked; recipe join selects `id`, `title`, `timeMinutes` only |
+| Recipe | **`getRecipe`** | Single recipe by `recipe_id` or one meal slot (`date` + `meal_type`); not full catalog |
+| Nutrition summary | **`getNutritionSummary`** | **`period: day`** OR **`week`** — one analytics call, not both |
+| Daily check-in | **`getDailyCheckIn`** | **`period: day`** → one row; **`week`** → 7-day date range only |
+| Charts | **`getChartData`** | One `chart_type` per call; `days` clamped **7–90**; `protein_vs_target` / `macro_breakdown` use **today's** daily summary, not full history |
+| Recipe search | **`searchRecipes`** | `limit` clamped **1–15** (default **8**); returns card fields, not full ingredient trees for entire catalog |
+| Static shortcuts | **`assistant-wingman.service.ts`** → `tryStaticReply` | Known intents (medical, add meal, mark eaten) skip LLM + tool loop entirely |
+
+#### Live comparison demo (show toolTraces differ by question)
+
+| Ask Wingman | Expected tool(s) | Should **not** run |
+|-------------|------------------|-------------------|
+| What's my current BMI? | `get_health_metrics` (`metric_type: bmi` or `all`) | `get_meal_plan`, `search_recipes`, `get_nutrition_summary` |
+| What's on my meal plan today? | `get_meal_plan` (`scope: day`) | `get_chart_data`, full week plan unless asked |
+| What's my meal plan for the week? | `get_meal_plan` (`scope: week`) | `search_recipes`, all recipes |
+| Show my weight trend for the last month | `get_chart_data` (`weight_trend`, `days` ~30) | `get_meal_plan`, `get_recipe` |
+| How do I prepare tonight's dinner? | `get_meal_plan` → `get_recipe` (one slot) | `search_recipes`, whole catalog |
+
+**Student talk track:** “We fetch through narrow tool functions tied to the user's question. Context loading uses Prisma `select`, message caps, and token trimming so we don't send the entire thread or profile to the model every turn.”
+
+**Honest limits:** `get_progress_summary` always loads 30-day weight series and profile fields regardless of `focus` (focus labels the response, does not skip backend calls). Day-scope `get_meal_plan` still loads the plan version's meals then filters by `dayIndex` in memory — acceptable for typical plan sizes, not a separate SQL filter per day.
+
+---
+
+## Before demo (5 min)
+
+1. `pnpm compose:up --build` (or local dev + migrate)
+2. Seed: `docker compose exec api sh -lc "cd /repo/apps/api && pnpm nutrition:seed && pnpm demo:seed"`
+3. Set keys in **repo root** `.env`: `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` + `ASSISTANT_LLM_PROVIDER=openai`); optional `GEMINI_API_KEY` for meal photos
+4. For **context-compression demo**, add `ASSISTANT_CONTEXT_TOKEN_BUDGET=3000` (restore `12000` after review)
+5. Rebuild/restart API after env changes: `docker compose up -d --build api`
+6. Open http://localhost:8080 and http://localhost:3000/docs
+7. Sign in: `demo@numbers.local` / `DemoPassword123!`
+8. Optional offline: `pnpm wingman:eval` (18/18 routing checks)
+
+---
+
+## Suggested live demo flow (~20 min)
+
+| # | Show | Files / endpoints to mention |
+|---|------|------------------------------|
+| 1 | App tabs + Wingman FAB | `apps/web/src/wingman/` |
+| 2 | `What's my current BMI?` | `get_health_metrics`; **`toolTraces`** in network tab |
+| 3 | `What's on my meal plan today?` | `get_meal_plan`; compare Nutrition tab |
+| 4 | `Show my weight trend for the last month` | `get_chart_data` → chart `ui_block` |
+| 5 | Follow-up: `Can you tell me more about that?` | **`wingman-context.util.ts`** token budget + thread history |
+| 6 | 10+ turn thread + dietary constraint recall | § Extra criteria above; `GET /api/assistant/threads/:id` → `summary` |
+| 7 | Topic shift nutrition → exercise | § Extra criteria; optional `PATCH` coaching mode |
+| 7b | Compare **`toolTraces`** across 3 questions | § Efficient data retrieval — BMI vs meal plan vs chart; different tools only |
+| 8 | `record 1 hour tennis for today` → **Confirm** | Static intent → **`confirm_log_activity`** |
+| 9 | Chest pain + `What is my email?` | **`system-prompt.ts`** Safety; **`MEDICAL_URGENT`** static path |
+| 10 | Open **`system-prompt.ts`** + **`assistant-tool-definitions.ts`** | Prompt + tool catalog for reviewer |
+| 11 | Optional: **`docs/PROMPT_ENGINEERING.md`**, **`IMPLEMENTATION_STATUS.md`** | Model choice, honest gaps |
+
+---
+
+## Questions reviewers may ask
+
+- Where is the system prompt? → **`apps/api/src/assistant/prompts/system-prompt.ts`**
+- Where are format examples? → **`docs/PROMPT_EXAMPLES.md`** + **`few-shot-snippet.ts`**
+- How does history compression work? → Token trim in **`wingman-context.util.ts`** + thread summary from 8+ msgs; see § Extra criteria above
+- Does topic shift auto-compress old context? → **No separate router** — prompt scope + manual coaching modes; see IMPLEMENTATION_STATUS 🟡 row
+- How do you avoid overfetching user data? → Tool-scoped calls in **`assistant-tools.service.ts`**; narrow context `select` + caps in **`buildLlmContext`**; see § Efficient data retrieval
+- How do you prevent hallucinated calories? → Tools + confirm writes; meal photos → DB path (`docs/DAILY_WELLNESS.md`)
+- Why Anthropic for wingman and OpenAI for meal plans? → **`docs/STACK.md`**, **`SECURITY_AND_AI_DECISIONS.md`**
+- How is conversation history stored? → Prisma threads; token trim + optional LLM summary from 8+ messages
+- What happens when the LLM API is down? → **`GET /api/assistant/bootstrap`**; disabled message in UI
+
+Prepare answers from **`docs/ARCHITECTURE.md`**, **`docs/WINGMAN_ONBOARDING.md`**, **`docs/LONG_TERM_MEMORY.md`**, and Part 1 **`SECURITY_AND_AI_DECISIONS.md`**.
+
