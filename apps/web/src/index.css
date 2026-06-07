@@ -19,6 +19,7 @@
   --secondary-ink: #0f172a;
   --chip-bg: #f8fafc;
   --chip-ink: #334155;
+  --radius: 0.75rem;
 }
 
 :root[data-theme='dark'] {

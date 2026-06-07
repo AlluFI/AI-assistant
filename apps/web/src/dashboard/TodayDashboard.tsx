@@ -9,12 +9,17 @@ type Props = {
   onViewNutrition?: () => void
 }
 
-function macroRing(pct: number) {
+function macroRing(pct: number, color?: string, size: 'md' | 'sm' = 'md') {
   const clamped = Math.min(100, Math.max(0, pct))
   return (
     <div
-      className="macroRing"
-      style={{ '--macro-pct': `${clamped}%` } as CSSProperties}
+      className={`macroRing${size === 'sm' ? ' macroRingSm' : ''}`}
+      style={
+        {
+          '--macro-pct': `${clamped}%`,
+          ...(color ? { '--macro-color': color } : {}),
+        } as CSSProperties
+      }
       role="progressbar"
       aria-valuenow={clamped}
       aria-valuemin={0}
@@ -24,6 +29,12 @@ function macroRing(pct: number) {
     </div>
   )
 }
+
+const MACRO_OVERVIEW = [
+  { key: 'protein' as const, label: 'Protein', color: '#2563eb' },
+  { key: 'carbs' as const, label: 'Carbs', color: '#16a34a' },
+  { key: 'fats' as const, label: 'Fats', color: '#f59e0b' },
+]
 
 export function TodayDashboard({
   today,
@@ -36,7 +47,6 @@ export function TodayDashboard({
   const targetCal = n?.target.calories ?? 2000
   const intakeCal = n?.intake.calories ?? 0
   const remaining = n?.caloriesRemaining ?? Math.max(0, targetCal - intakeCal)
-  const proteinPct = n?.macroPercentOfTarget.protein ?? 0
 
   return (
     <section className="card cardSpan2 todayDashboard">
@@ -64,12 +74,25 @@ export function TodayDashboard({
             </span>
           </div>
 
-          <div className="todayStat">
-            <span className="todayStatLabel">Protein</span>
-            {macroRing(proteinPct)}
-            <span className="hint">
-              {Math.round(n?.intake.protein ?? 0)}g / {n?.target.macros.protein ?? '—'}g
-            </span>
+          <div className="todayStat todayStatMacros">
+            <span className="todayStatLabel">Macros today</span>
+            <p className="hint todayMacrosHint">Logged intake vs daily targets</p>
+            <div className="todayMacrosGrid">
+              {MACRO_OVERVIEW.map(({ key, label, color }) => {
+                const pct = n?.macroPercentOfTarget[key] ?? 0
+                const intake = Math.round(n?.intake[key] ?? 0)
+                const target = n?.target.macros[key]
+                return (
+                  <div key={key} className="todayMacroItem">
+                    <span className="todayMacroName">{label}</span>
+                    {macroRing(pct, color, 'sm')}
+                    <span className="hint todayMacroAmount">
+                      {intake}g / {target ?? '—'}g
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div className="todayStat">

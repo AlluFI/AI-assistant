@@ -853,17 +853,77 @@
   border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
 }
 
+.todayStatMacros {
+  grid-column: span 2;
+}
+
+.todayMacrosHint {
+  margin: -0.15rem 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+.todayMacrosGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.15rem;
+}
+
+.todayMacroItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.todayMacroName {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, var(--muted));
+}
+
+.todayMacroAmount {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 520px) {
+  .todayStatMacros {
+    grid-column: span 1;
+  }
+
+  .todayMacrosGrid {
+    gap: 0.45rem;
+  }
+}
+
 .macroRing {
   --macro-pct: 0%;
+  --macro-color: var(--primary);
   width: 3.25rem;
   height: 3.25rem;
   border-radius: 50%;
   background: conic-gradient(
-    var(--primary) 0 var(--macro-pct),
+    var(--macro-color) 0 var(--macro-pct),
     var(--border) var(--macro-pct) 100%
   );
   display: grid;
   place-items: center;
+}
+
+.macroRingSm {
+  width: 2.65rem;
+  height: 2.65rem;
+}
+
+.macroRingSm .macroRingLabel {
+  width: 1.85rem;
+  height: 1.85rem;
+  font-size: 0.62rem;
 }
 
 .macroRingLabel {
