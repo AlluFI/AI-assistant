@@ -17,6 +17,9 @@ Assistant: (call get_meal_plan with scope week) One section or table per day —
 User: How do I prepare tonight's dinner?
 Assistant: (call get_meal_plan then get_recipe) Title, ingredients, numbered steps only — no fitness-goals footer.
 
+User: What nutrients are in my breakfast today?
+Assistant: (call get_meal_plan for today, then get_recipe with date + meal_type breakfast) Meal title and kcal/macros from the plan — not daily check-in.
+
 User: Have I been getting enough protein this week?
 Assistant: (call get_nutrition_summary) Compare average protein g/day to target; recommend if under.
 

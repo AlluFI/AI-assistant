@@ -46,12 +46,11 @@ pnpm dev:web    # terminal 2 — http://localhost:5173
 | Part | Where to look |
 |------|----------------|
 | 1–2 | Overview (**Today**, quick food log, check-in with optional steps), **Weight & activity**, Profile, Insights, Nutrition; optional **Admin** (`docs/ADMIN.md`); `REVIEW_CHECKLIST.md`, `TEST_MATRIX.md`, `docs/DAILY_WELLNESS.md` |
-| 3 bootstrap | `GET /api/assistant/bootstrap`, Swagger **assistant** tag; `docs/ARCHITECTURE.md` |
-| 3 wingman | Floating chat (💬), setup wizard (`docs/WINGMAN_ONBOARDING.md`), 11 tools; `apps/api/src/assistant/`, Swagger **assistant** tag |
+| 3 wingman | Floating chat (💬), setup wizard (`docs/WINGMAN_ONBOARDING.md`), 11 tools; `apps/api/src/assistant/`, Swagger **assistant** tag; optional `GET /api/assistant/bootstrap` (provider + DB readiness) |
 
 ```bash
-pnpm phase3:bootstrap
-curl -s http://localhost:3000/api/assistant/bootstrap | jq
+curl -s http://localhost:3000/api/assistant/bootstrap | jq   # optional
+pnpm wingman:eval
 ```
 
 ## AI keys (optional but recommended)
@@ -75,6 +74,6 @@ Without keys, Parts 1–2 use deterministic fallbacks where documented in `SECUR
 ```
 apps/api/     NestJS + Prisma (all parts)
 apps/web/     React client
-docs/         Phase 3 design + bootstrap notes
+docs/         Architecture, wingman, reviewer setup
 docker/       Compose stack
 ```

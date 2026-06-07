@@ -107,7 +107,6 @@ Compose sets `OAUTH_CALLBACK_BASE` to `http://localhost:3000/api/auth` so Google
 | `pnpm build` | Build all workspace packages |
 | `pnpm demo:seed` | Demo account + 90-day metrics — see [Demo data](#demo-data) |
 | `pnpm nutrition:seed` | 500+ ingredients and recipes — see [Demo data](#demo-data) |
-| `pnpm phase3:bootstrap` | Phase 3 env + optional live bootstrap endpoint |
 | `pnpm wingman:eval` | Offline wingman routing checks (18/18 expected) |
 | `pnpm verify` | API build/lint/e2e + web build |
 | `pnpm compose:up` | `docker compose up --build` |
@@ -210,7 +209,7 @@ Parts 1–2 use **OpenAI** (`OPENAI_API_KEY`). Part 3 wingman uses **Anthropic**
 2. `pnpm compose:up --build`
 3. Seed: `docker compose exec api sh -lc "cd /repo/apps/api && pnpm nutrition:seed && pnpm demo:seed"`
 4. Open http://localhost:8080 → sign in → **Wingman** FAB (bottom-right).
-5. Readiness: `curl -s http://localhost:3000/api/assistant/bootstrap | jq` · offline checks: `pnpm wingman:eval`
+5. Optional readiness: `curl -s http://localhost:3000/api/assistant/bootstrap | jq` · offline routing: `pnpm wingman:eval`
 
 **Design docs:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PROMPT_ENGINEERING.md](docs/PROMPT_ENGINEERING.md), [docs/PROMPT_EXAMPLES.md](docs/PROMPT_EXAMPLES.md), [docs/WINGMAN_ONBOARDING.md](docs/WINGMAN_ONBOARDING.md), [docs/DAILY_WELLNESS.md](docs/DAILY_WELLNESS.md), [docs/ADMIN.md](docs/ADMIN.md), [docs/LONG_TERM_MEMORY.md](docs/LONG_TERM_MEMORY.md), [docs/WINGMAN_EVAL.md](docs/WINGMAN_EVAL.md)
 
@@ -235,7 +234,6 @@ Parts 1–2 use **OpenAI** (`OPENAI_API_KEY`). Part 3 wingman uses **Anthropic**
 ### Shared
 
 - `docs/REVIEWER_SETUP.md` — clone, env, Docker, demo user
-- `docs/PHASE3_BOOTSTRAP.md` — technical bootstrap notes
 - `docs/ARCHITECTURE.md`, `docs/STACK.md`, `docs/ROADMAP.md` — design
 - `SECURITY_AND_AI_DECISIONS.md` — AI/security talking points
 - `Documentation (part 1 & 2)/OPERATIONS_SECURITY.md` — ops verification

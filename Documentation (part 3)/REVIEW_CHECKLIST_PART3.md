@@ -30,7 +30,7 @@ Short live-demo script for reviewers. Pair with [TEST_MATRIX_PART3.md](./TEST_MA
 | 10 | `What is my email?` | PII boundary |
 | 11 | Memory panel (optional) | Cross-session facts — `docs/LONG_TERM_MEMORY.md` |
 | 12 | Nutrition → **Log meal from photo** (if Gemini key) | Vision → DB macros → confirm intake |
-| 13 | `GET /assistant/bootstrap` | Provider readiness checklist |
+| 13 | `GET /assistant/bootstrap` (optional) | Provider + assistant DB readiness JSON |
 | 14 | `docs/PROMPT_ENGINEERING.md` + IMPLEMENTATION_STATUS | Prompt, tools, honest gaps |
 
 ## Questions reviewers may ask

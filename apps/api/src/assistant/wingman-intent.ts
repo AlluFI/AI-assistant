@@ -218,6 +218,7 @@ export type ParsedGenerateMealPlan = {
 export function parseGenerateMealPlanIntent(
   text: string,
 ): ParsedGenerateMealPlan | null {
+  if (parseShoppingListIntent(text)) return null;
   const lower = text.toLowerCase();
   if (
     !/\b(generate|create|make|build|new)\b/i.test(lower) ||

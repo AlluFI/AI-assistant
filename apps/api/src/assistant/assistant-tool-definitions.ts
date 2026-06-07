@@ -69,7 +69,7 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
     function: {
       name: 'get_recipe',
       description:
-        'Full recipe details: ingredients, preparation steps, nutrition per serving. Use recipe_id from get_meal_plan, or pass date + meal_type to load from the active meal plan.',
+        'Full recipe details: ingredients, preparation steps, nutrition per serving. For a planned meal slot (e.g. breakfast today), pass date (YYYY-MM-DD) and meal_type — do not call without recipe_id unless both are set. Use recipe_id from get_meal_plan when available.',
       parameters: {
         type: 'object',
         properties: {

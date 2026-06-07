@@ -8,7 +8,6 @@
     "lint": "pnpm -r lint",
     "demo:seed": "pnpm --filter api demo:seed",
     "nutrition:seed": "pnpm --filter api nutrition:seed",
-    "phase3:bootstrap": "node scripts/phase3-bootstrap-check.mjs",
     "wingman:eval": "pnpm --filter api wingman:eval",
     "verify": "pnpm --filter api build && pnpm --filter api lint && pnpm --filter api test && pnpm --filter api test:e2e && pnpm --filter web build",
     "compose:up": "docker compose up --build",

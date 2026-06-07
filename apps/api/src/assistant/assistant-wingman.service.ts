@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { WingmanLlmFacade } from '../ai/llm/wingman-llm.facade';
@@ -9,7 +9,15 @@ import {
   chartUiBlocksFromToolTraces,
   inferChartToolCall,
 } from './chart-ui-blocks.util';
-import { inferMealRecipeToolCall } from './meal-recipe-infer.util';
+import {
+  inferPlannedMealSlotToolCall,
+  isPlannedMealNutrientsQuestion,
+  normalizeRecipeToolArgs,
+} from './meal-recipe-infer.util';
+import {
+  formatPlannedMealNutrientsReply,
+  mealTypeLabel,
+} from './planned-meal-nutrients.util';
 import {
   inferMealPlanWeekScope,
   normalizeMealPlanToolArgs,
@@ -100,20 +108,8 @@ export class AssistantWingmanService {
       resultSummary: string;
     }> = [];
 
-    const executeTool = async (name: string, args: Record<string, unknown>) => {
-      const normalizedArgs =
-        name === 'get_meal_plan'
-          ? normalizeMealPlanToolArgs(userMessage, args)
-          : args;
-      const result = await this.tools.execute(userId, name, normalizedArgs);
-      traceResults.push({
-        name,
-        args: normalizedArgs,
-        result,
-        resultSummary: JSON.stringify(result).slice(0, 500),
-      });
-      return result;
-    };
+    const executeTool = (name: string, args: Record<string, unknown>) =>
+      this.executeWingmanTool(userId, userMessage, name, args, traceResults);
 
     const result = await this.llm.chat({
       system: ctx.system,
@@ -184,20 +180,8 @@ export class AssistantWingmanService {
       resultSummary: string;
     }> = [];
 
-    const executeTool = async (name: string, args: Record<string, unknown>) => {
-      const normalizedArgs =
-        name === 'get_meal_plan'
-          ? normalizeMealPlanToolArgs(userMessage, args)
-          : args;
-      const result = await this.tools.execute(userId, name, normalizedArgs);
-      traceResults.push({
-        name,
-        args: normalizedArgs,
-        result,
-        resultSummary: JSON.stringify(result).slice(0, 500),
-      });
-      return result;
-    };
+    const executeTool = (name: string, args: Record<string, unknown>) =>
+      this.executeWingmanTool(userId, userMessage, name, args, traceResults);
 
     let finalContent = '';
 
@@ -358,6 +342,46 @@ export class AssistantWingmanService {
       };
     }
 
+    const mealSlot = inferPlannedMealSlotToolCall(userMessage);
+    if (mealSlot && isPlannedMealNutrientsQuestion(userMessage)) {
+      const plan = (await this.tools.execute(userId, 'get_meal_plan', {
+        date: mealSlot.date,
+      })) as {
+        error?: string;
+        meals?: Array<{
+          mealType: string;
+          title: string;
+          calories: number | null;
+          protein: number | null;
+          carbs: number | null;
+          fats: number | null;
+          recipeLinked?: boolean;
+        }>;
+      };
+      if (plan.error) {
+        return {
+          content:
+            'Create or activate a meal plan in the Nutrition tab first, then I can read breakfast, lunch, or dinner macros from your plan.',
+          uiBlocks: [
+            { type: 'cta', label: 'Open Nutrition tab', action: 'open_nutrition' },
+          ],
+        };
+      }
+      const meal = plan.meals?.find((m) => m.mealType === mealSlot.meal_type);
+      if (!meal) {
+        return {
+          content: `I don't see **${mealTypeLabel(mealSlot.meal_type).toLowerCase()}** on your plan for ${mealSlot.date}.`,
+        };
+      }
+      return {
+        content: formatPlannedMealNutrientsReply(
+          mealTypeLabel(mealSlot.meal_type),
+          mealSlot.date,
+          meal,
+        ),
+      };
+    }
+
     const markEaten = parseMarkMealEatenIntent(userMessage);
     if (markEaten) {
       const today = new Date().toISOString().slice(0, 10);
@@ -398,24 +422,6 @@ export class AssistantWingmanService {
               versionId: plan.versionId,
               mealId: meal.id,
               mealTitle: meal.title,
-            },
-          },
-        ],
-      };
-    }
-
-    const generatePlan = parseGenerateMealPlanIntent(userMessage);
-    if (generatePlan) {
-      return {
-        content: `I can generate a **${generatePlan.duration}** meal plan starting ${generatePlan.startDate}. Confirm to create it (this may take a moment).`,
-        uiBlocks: [
-          {
-            type: 'cta',
-            label: `Confirm: Generate ${generatePlan.duration} plan`,
-            action: 'confirm_generate_meal_plan',
-            payload: {
-              startDate: generatePlan.startDate,
-              duration: generatePlan.duration,
             },
           },
         ],
@@ -501,6 +507,24 @@ export class AssistantWingmanService {
             label: 'Confirm: Create shopping list',
             action: 'confirm_generate_shopping_list',
             payload: { versionId: plan.versionId },
+          },
+        ],
+      };
+    }
+
+    const generatePlan = parseGenerateMealPlanIntent(userMessage);
+    if (generatePlan) {
+      return {
+        content: `I can generate a **${generatePlan.duration}** meal plan starting ${generatePlan.startDate}. Confirm to create it (this may take a moment).`,
+        uiBlocks: [
+          {
+            type: 'cta',
+            label: `Confirm: Generate ${generatePlan.duration} plan`,
+            action: 'confirm_generate_meal_plan',
+            payload: {
+              startDate: generatePlan.startDate,
+              duration: generatePlan.duration,
+            },
           },
         ],
       };
@@ -682,19 +706,84 @@ export class AssistantWingmanService {
     };
   }
 
-  /** When the user asks how to prepare a planned meal but skips `get_recipe`. */
+  private normalizeWingmanToolArgs(
+    userMessage: string,
+    name: string,
+    args: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (name === 'get_meal_plan') {
+      return normalizeMealPlanToolArgs(userMessage, args);
+    }
+    if (name === 'get_recipe') {
+      return normalizeRecipeToolArgs(userMessage, args);
+    }
+    return args;
+  }
+
+  private async executeWingmanTool(
+    userId: string,
+    userMessage: string,
+    name: string,
+    args: Record<string, unknown>,
+    traceResults: Array<{
+      name: string;
+      args: Record<string, unknown>;
+      result: unknown;
+      resultSummary: string;
+    }>,
+  ): Promise<unknown> {
+    const normalizedArgs = this.normalizeWingmanToolArgs(
+      userMessage,
+      name,
+      args,
+    );
+    try {
+      const result = await this.tools.execute(userId, name, normalizedArgs);
+      traceResults.push({
+        name,
+        args: normalizedArgs,
+        result,
+        resultSummary: JSON.stringify(result).slice(0, 500),
+      });
+      return result;
+    } catch (e) {
+      const message =
+        e instanceof BadRequestException
+          ? String(e.message)
+          : e instanceof Error
+            ? e.message
+            : 'Tool failed';
+      const errResult = { error: true, message };
+      traceResults.push({
+        name,
+        args: normalizedArgs,
+        result: errResult,
+        resultSummary: JSON.stringify(errResult).slice(0, 500),
+      });
+      return errResult;
+    }
+  }
+
+  /** When the user asks about a planned meal slot but skips tools or bad args. */
+  private recipeToolSucceeded(
+    traceResults: Array<{ name: string; result?: unknown }>,
+  ): boolean {
+    const row = traceResults.find((t) => t.name === 'get_recipe');
+    if (!row) return false;
+    const r = row.result as { error?: boolean } | undefined;
+    return Boolean(r && !r.error);
+  }
+
   private async applyInferredRecipeTool(
     userMessage: string,
-    traceResults: Array<{ name: string }>,
+    traceResults: Array<{ name: string; result?: unknown }>,
     executeTool: (
       name: string,
       args: Record<string, unknown>,
     ) => Promise<unknown>,
   ) {
-    const inferred = inferMealRecipeToolCall(userMessage);
-    if (!inferred || traceResults.some((t) => t.name === 'get_recipe')) {
-      return;
-    }
+    const inferred = inferPlannedMealSlotToolCall(userMessage);
+    if (!inferred || this.recipeToolSucceeded(traceResults)) return;
     if (!traceResults.some((t) => t.name === 'get_meal_plan')) {
       await executeTool('get_meal_plan', { date: inferred.date });
     }
@@ -706,14 +795,14 @@ export class AssistantWingmanService {
 
   private async *applyInferredRecipeToolStream(
     userMessage: string,
-    traceResults: Array<{ name: string }>,
+    traceResults: Array<{ name: string; result?: unknown }>,
     executeTool: (
       name: string,
       args: Record<string, unknown>,
     ) => Promise<unknown>,
   ): AsyncGenerator<WingmanStreamEvent> {
-    const inferred = inferMealRecipeToolCall(userMessage);
-    if (!inferred || traceResults.some((t) => t.name === 'get_recipe')) {
+    const inferred = inferPlannedMealSlotToolCall(userMessage);
+    if (!inferred || this.recipeToolSucceeded(traceResults)) {
       return;
     }
     if (!traceResults.some((t) => t.name === 'get_meal_plan')) {

@@ -11,8 +11,7 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 | Method | Path | Auth | Notes |
 |--------|------|------|--------|
 | `GET` | `/api/health` | No | `{ status: "ok" }` |
-| `GET` | `/api/assistant/bootstrap` | No | Providers, DB tables, checklist |
-| — | `pnpm phase3:bootstrap` | — | Offline env check |
+| `GET` | `/api/assistant/bootstrap` | No | `enabled`, providers (`openAi`, `anthropic`, `gemini`), `database.assistantTables` |
 | — | `pnpm wingman:eval` | — | 18 routing heuristics (offline) |
 
 ---

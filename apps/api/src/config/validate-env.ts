@@ -132,10 +132,6 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  AI_ASSISTANT_DESIGN_REPO?: string;
-
-  @IsString()
-  @IsOptional()
   PORT?: string;
 
   @IsString()

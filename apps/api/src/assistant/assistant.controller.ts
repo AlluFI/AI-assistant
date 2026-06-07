@@ -31,10 +31,10 @@ export class AssistantController {
   @Get('bootstrap')
   @SkipThrottle()
   @ApiOperation({
-    summary: 'Phase 3 readiness (providers, DB, checklist)',
+    summary: 'Wingman readiness (providers, assistant DB tables)',
   })
   bootstrap() {
-    return this.assistant.getBootstrapReport();
+    return this.assistant.getReadinessReport();
   }
 
   @ApiBearerAuth('access-token')

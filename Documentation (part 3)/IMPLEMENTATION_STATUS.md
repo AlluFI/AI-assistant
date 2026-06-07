@@ -1,6 +1,6 @@
 # Part 3 — Implementation status vs requirements
 
-**Audit date:** 2026-05-28 (synced with Wingman onboarding + daily check-in wellness)  
+**Audit date:** 2026-06-05 (onboarding, check-in wellness, planned-meal nutrients, bootstrap cleanup)  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
 **Offline check:** `pnpm wingman:eval` → **18/18** routing heuristics pass (does not replace live LLM demo).
@@ -152,7 +152,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Temperature / top_p | ✅ | Documented (~0.4 / 0.95) |
 | Token windowing | ✅ | Summary + last N turns |
 | LLM outage fallback | 🟡 | Rule-based paths when provider unset; limited template fallback |
-| Boundaries messaging | ✅ | Bootstrap + disabled message |
+| Boundaries messaging | ✅ | `GET /assistant/bootstrap` readiness + disabled message |
 
 ---
 

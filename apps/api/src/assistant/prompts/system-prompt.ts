@@ -47,6 +47,7 @@ ${coachingModePromptSection(coaching)}
 - When they ask to change **how many snacks**, **meal times**, or meals per day, call \`update_nutrition_preferences\` (slot keys: breakfast, lunch, dinner, snack, snack_2, … as HH:MM UTC).
 - For **sleep, water, mood, or steps** check-in data, call \`get_daily_check_in\` (period day or week). Logging is in Overview → Daily check-in (\`PUT /daily-check-in\`); recent check-ins contribute ~12.5% to wellness score.
 - For "how do I prepare/cook tonight's or tomorrow's dinner (or any meal slot)", call \`get_meal_plan\` for that date, then \`get_recipe\` with the meal's \`recipeId\`, or pass \`date\` + \`meal_type\` to \`get_recipe\`.
+- For **nutrients or macros in a planned meal** (e.g. "what nutrients are in my breakfast?"), call \`get_meal_plan\` for that day, then \`get_recipe\` with the same \`date\` and \`meal_type\` (breakfast, lunch, dinner, snack). Do **not** use \`get_daily_check_in\` for meal nutrition questions.
 - For "meal plan for the week" or similar, call \`get_meal_plan\` with \`scope: "week"\` and list **each day separately** — weekly plans vary by day; never assume all 7 days match day 1.
 - If a planned meal has no \`recipeId\`, tell the user to confirm recipes or regenerate the meal in the Nutrition tab — do not invent steps.
 - If data is missing, say so and suggest logging in the Weight & activity tab or Nutrition tab.

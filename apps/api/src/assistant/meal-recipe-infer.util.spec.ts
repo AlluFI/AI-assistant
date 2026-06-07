@@ -1,4 +1,9 @@
-import { inferMealRecipeToolCall } from './meal-recipe-infer.util';
+import {
+  inferMealRecipeToolCall,
+  inferPlannedMealSlotToolCall,
+  isPlannedMealNutrientsQuestion,
+  normalizeRecipeToolArgs,
+} from './meal-recipe-infer.util';
 
 describe('inferMealRecipeToolCall', () => {
   function utcTodayPlus(days: number): string {
@@ -25,5 +30,25 @@ describe('inferMealRecipeToolCall', () => {
 
   it('ignores unrelated questions', () => {
     expect(inferMealRecipeToolCall('What is my BMI?')).toBeNull();
+  });
+
+  it('detects breakfast nutrients question', () => {
+    expect(isPlannedMealNutrientsQuestion('What nutrients are in my breakfast?')).toBe(
+      true,
+    );
+    const slot = inferPlannedMealSlotToolCall('What nutrients are in my breakfast?');
+    expect(slot?.meal_type).toBe('breakfast');
+    expect(slot?.date).toBe(utcTodayPlus(0));
+  });
+
+  it('normalizes get_recipe args from user message', () => {
+    expect(
+      normalizeRecipeToolArgs('What nutrients are in my breakfast?', {
+        meal_type: 'breakfast',
+      }),
+    ).toMatchObject({
+      meal_type: 'breakfast',
+      date: utcTodayPlus(0),
+    });
   });
 });

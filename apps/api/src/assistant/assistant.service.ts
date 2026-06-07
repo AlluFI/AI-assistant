@@ -21,11 +21,9 @@ import { WingmanOnboardingService } from './onboarding/wingman-onboarding.servic
 import { ActivityRecordDto } from '../profile/dto/activity-record.dto';
 import { MetricRecordDto } from '../profile/dto/metric-record.dto';
 import type { AssistantUiBlock } from './assistant-ui.types';
-import type { Phase3BootstrapReport } from './assistant.types';
+import type { AssistantReadinessReport } from './assistant.types';
 import type { ConfirmAssistantActionDto } from './dto/confirm-action.dto';
 import type { PatchAssistantThreadDto } from './dto/patch-thread.dto';
-
-const DESIGN_REPO_DEFAULT = 'docs/';
 
 @Injectable()
 export class AssistantService {
@@ -59,25 +57,18 @@ export class AssistantService {
     return flag !== 'false';
   }
 
-  async getBootstrapReport(): Promise<Phase3BootstrapReport> {
+  async getReadinessReport(): Promise<AssistantReadinessReport> {
     const assistantTables = await this.hasAssistantTables();
     const wingmanChat = this.assistantLlm.wingmanChatConfigured();
 
     return {
-      phase: 'bootstrap',
-      designRepo:
-        this.config.get<string>('AI_ASSISTANT_DESIGN_REPO') ??
-        DESIGN_REPO_DEFAULT,
       enabled: this.chatEnabled(),
       providers: {
-        parts12OpenAi: Boolean(this.openai.apiKey),
-        assistantAnthropic: wingmanChat,
-        visionGemini: Boolean(
-          this.config.get<string>('GEMINI_API_KEY')?.trim(),
-        ),
+        openAi: Boolean(this.openai.apiKey),
+        anthropic: wingmanChat,
+        gemini: Boolean(this.config.get<string>('GEMINI_API_KEY')?.trim()),
       },
       database: { assistantTables },
-      checklist: this.buildChecklist(assistantTables, wingmanChat),
     };
   }
 
@@ -763,70 +754,4 @@ export class AssistantService {
     }
   }
 
-  private buildChecklist(
-    assistantTables: boolean,
-    anthropicConfigured: boolean,
-  ) {
-    const openAi = Boolean(this.openai.apiKey);
-    return [
-      {
-        id: 'parts-12-openai',
-        title: 'Parts 1–2: meal plans, insights, RAG (OpenAI)',
-        owner: 'code' as const,
-        status: openAi ? ('done' as const) : ('todo' as const),
-        notes: openAi ? undefined : 'Set OPENAI_API_KEY for full AI features',
-      },
-      {
-        id: 'assistant-schema',
-        title: 'AssistantThread + AssistantMessage tables',
-        owner: 'code' as const,
-        status: assistantTables ? ('done' as const) : ('todo' as const),
-        notes: assistantTables ? undefined : 'Run prisma migrate deploy',
-      },
-      {
-        id: 'assistant-bootstrap-api',
-        title: 'GET /api/assistant/bootstrap readiness report',
-        owner: 'code' as const,
-        status: 'done' as const,
-      },
-      {
-        id: 'assistant-thread-crud',
-        title: 'Thread CRUD + persisted messages',
-        owner: 'code' as const,
-        status: assistantTables ? ('done' as const) : ('todo' as const),
-      },
-      {
-        id: 'anthropic-wingman',
-        title: 'Wingman LLM + tool loop (8 read tools)',
-        owner: 'both' as const,
-        status:
-          anthropicConfigured || this.openai.apiKey
-            ? ('done' as const)
-            : ('todo' as const),
-        notes:
-          'ANTHROPIC_API_KEY or OPENAI_API_KEY; see docs/PROMPT_EXAMPLES.md',
-      },
-      {
-        id: 'gemini-meal-photo',
-        title: 'Gemini vision → structured foods → DB calories',
-        owner: 'code' as const,
-        status: this.config.get<string>('GEMINI_API_KEY')?.trim()
-          ? ('done' as const)
-          : ('todo' as const),
-        notes: 'POST /api/meal-photos/analyze + confirm',
-      },
-      {
-        id: 'assistant-ui',
-        title: 'Chat panel + chart ui_blocks in web',
-        owner: 'code' as const,
-        status: 'done' as const,
-      },
-      {
-        id: 'design-docs',
-        title: 'Architecture, API sketch, roadmap',
-        owner: 'docs' as const,
-        status: 'done' as const,
-      },
-    ];
-  }
 }

@@ -47,6 +47,13 @@ export function inferExpectedTools(message: string): string[] {
   if (/recipe details|how do i prepare|how to prepare|prepare tonight|prepare tomorrow|ingredients for/i.test(lower)) {
     tools.push('get_meal_plan', 'get_recipe');
   }
+  if (
+    /nutrient|macro|what'?s in my (breakfast|lunch|dinner)|breakfast.*(calorie|protein|macro)/i.test(
+      lower,
+    )
+  ) {
+    tools.push('get_meal_plan', 'get_recipe');
+  }
   const chart = inferChartToolCall(message);
   if (chart) tools.push('get_chart_data');
   if (/weight trend|weight change/i.test(lower) && !chart) {
@@ -69,8 +76,8 @@ export function inferExpectedIntent(
   if (parseLogActivityIntent(message)) return 'log_activity';
   if (parseLogWeightIntent(message)) return 'log_weight';
   if (parseMarkMealEatenIntent(message)) return 'mark_meal_eaten';
-  if (parseGenerateMealPlanIntent(message)) return 'generate_meal_plan';
-  if (parseRegenerateMealIntent(message)) return 'regenerate_meal';
   if (parseShoppingListIntent(message)) return 'shopping_list';
+  if (parseRegenerateMealIntent(message)) return 'regenerate_meal';
+  if (parseGenerateMealPlanIntent(message)) return 'generate_meal_plan';
   return null;
 }
