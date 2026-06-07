@@ -66,6 +66,12 @@
 - [x] Wingman **History** panel (thread list, switch, New chat)
 - [x] Token-aware context window (`ASSISTANT_CONTEXT_*`)
 
+## Phase 9 — Catalog recipes & meal plan UX (shipped)
+
+- [x] Wingman **`confirm_create_recipe`** — AI draft + persist to catalog when search is empty or user asks (`RecipesService.createFromWingmanRequest`)
+- [x] Weekly meal plan detail opens on **today's day** tab (not always Day 1)
+- [x] Today card: removed redundant **Nutrition** header button (main nav only)
+
 ## Open questions
 
 1. ~~Separate deployable vs monorepo~~ → **monorepo** for review

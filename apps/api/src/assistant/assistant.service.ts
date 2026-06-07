@@ -15,6 +15,7 @@ import type { WingmanStreamEvent } from '../ai/llm/wingman-stream.types';
 import { MealPlansService } from '../meal-plans/meal-plans.service';
 import { ProfileService } from '../profile/profile.service';
 import { ShoppingListsService } from '../shopping-lists/shopping-lists.service';
+import { RecipesService } from '../recipes/recipes.service';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
@@ -36,6 +37,7 @@ export class AssistantService {
     private readonly profile: ProfileService,
     private readonly mealPlans: MealPlansService,
     private readonly shoppingLists: ShoppingListsService,
+    private readonly recipes: RecipesService,
     private readonly nutritionAnalytics: NutritionAnalyticsService,
     private readonly nutrition: NutritionService,
     private readonly onboarding: WingmanOnboardingService,
@@ -609,6 +611,82 @@ export class AssistantService {
             label: 'Open shopping list',
             action: 'open_nutrition' as const,
             payload: { focus: 'shopping', shoppingListId: list.id },
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_create_recipe') {
+      const query =
+        typeof dto.payload.query === 'string' ? dto.payload.query.trim() : '';
+      if (!query) {
+        throw new BadRequestException('Invalid recipe payload');
+      }
+      const meal =
+        typeof dto.payload.meal === 'string' ? dto.payload.meal : undefined;
+      const cuisine =
+        typeof dto.payload.cuisine === 'string'
+          ? dto.payload.cuisine
+          : undefined;
+      const recipe = await this.recipes.createFromWingmanRequest(userId, {
+        query,
+        meal,
+        cuisine,
+      });
+      const kcal = recipe.nutrition?.calories ?? 0;
+      return {
+        ok: true,
+        action: dto.action,
+        result: recipe,
+        message: `Saved **${recipe.title}** to your recipe catalog (~${kcal} kcal/serving). You can find it in **Search recipes** on the Nutrition tab.`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Nutrition tab',
+            action: 'open_nutrition' as const,
+          },
+        ],
+      };
+    }
+
+    if (dto.action === 'confirm_add_manual_meal') {
+      const versionId =
+        typeof dto.payload.versionId === 'string' ? dto.payload.versionId : '';
+      const title =
+        typeof dto.payload.title === 'string' ? dto.payload.title.trim() : '';
+      const mealType =
+        typeof dto.payload.mealType === 'string'
+          ? dto.payload.mealType.trim().toLowerCase()
+          : '';
+      const scheduledAt =
+        typeof dto.payload.scheduledAt === 'string'
+          ? dto.payload.scheduledAt
+          : '';
+      const dayIndex = Number(dto.payload.dayIndex);
+      if (
+        !versionId ||
+        !title ||
+        !mealType ||
+        !scheduledAt ||
+        !Number.isFinite(dayIndex)
+      ) {
+        throw new BadRequestException('Invalid manual meal payload');
+      }
+      await this.mealPlans.addManualMeal(versionId, userId, {
+        dayIndex,
+        mealType,
+        scheduledAt,
+        title,
+      });
+      return {
+        ok: true,
+        action: dto.action,
+        message: `Added **${title}** to today's meal plan.`,
+        uiBlocks: [
+          {
+            type: 'cta' as const,
+            label: 'Open Nutrition tab',
+            action: 'open_nutrition' as const,
           },
         ],
       };

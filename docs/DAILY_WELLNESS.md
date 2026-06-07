@@ -8,7 +8,7 @@ After sign-in, open **Overview**. At the top:
 
 | Card | Purpose |
 |------|---------|
-| **Today** | Calories left, **macros today** (protein / carbs / fats rings vs daily targets), next planned meal, activity this week, reminders, 7-day adherence, streaks |
+| **Today** | Calories left, **macros today** (protein / carbs / fats rings vs daily targets), next planned meal, activity this week, reminders, 7-day adherence, streaks — navigate to **Nutrition** via the main tab bar (not a button on this card) |
 | **Quick food log** | Log food outside the meal plan (recipe search or single ingredient) |
 | **Daily check-in** | Sleep, water, mood, optional **steps** on main form; collapsible demo wearable import; **7-day habits average feeds ~12.5% of wellness score** (steps shown on Today only) |
 

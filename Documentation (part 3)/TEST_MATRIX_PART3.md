@@ -54,6 +54,19 @@ Companion: [REQUIREMENTS_QUICKCHECK.md](./REQUIREMENTS_QUICKCHECK.md), [PROJECT_
 }
 ```
 
+```json
+{
+  "action": "confirm_create_recipe",
+  "payload": {
+    "query": "high-protein vegan buddha bowl with tahini",
+    "meal": "dinner",
+    "cuisine": "asian"
+  }
+}
+```
+
+Persists a `Recipe` row (`source: wingman_confirmed`) with ingredients, steps, nutrition, and RAG embedding.
+
 ---
 
 ## 3) Meal photos API (JWT, optional `GEMINI_API_KEY`)
@@ -90,6 +103,7 @@ Prereq: signed in, `ASSISTANT_ENABLED` not `false`, migrations applied, LLM key 
 | 11 | Enable streaming (`VITE_ASSISTANT_STREAMING=true` build) | Tokens appear incrementally |
 | 12 | Fresh account or reset onboarding flags | Wingman opens with setup progress; `GET /assistant/onboarding` shows `active: true` — see [docs/WINGMAN_ONBOARDING.md](../../docs/WINGMAN_ONBOARDING.md) |
 | 13 | Overview → Daily check-in → save steps | Today card shows step count; Wingman `get_daily_check_in` matches |
+| 14 | Wingman: obscure recipe search → **Confirm: Create & save recipe** | Empty `search_recipes` offers CTA; confirm adds recipe to catalog (`OPENAI_API_KEY` recommended) |
 
 ---
 

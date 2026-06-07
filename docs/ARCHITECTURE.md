@@ -74,7 +74,7 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 
 **Onboarding:** scripted setup in chat — [WINGMAN_ONBOARDING.md](./WINGMAN_ONBOARDING.md).
 
-**Confirmed writes (UI, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, and `confirm_onboarding_*` (see onboarding doc). Rule-parsed weight/activity and meal-plan actions still require explicit confirm before DB writes.
+**Confirmed writes (UI, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, `confirm_create_recipe`, and `confirm_onboarding_*` (see onboarding doc). Rule-parsed weight/activity and meal-plan actions still require explicit confirm before DB writes.
 
 ## Response shape
 

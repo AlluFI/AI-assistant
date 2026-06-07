@@ -145,7 +145,6 @@ export function HealthOverview({
         busy={busy}
         onLogWeight={onLogWeight}
         onLogActivity={onLogActivity}
-        onViewNutrition={onViewNutrition}
       />
 
       {accessToken ? (

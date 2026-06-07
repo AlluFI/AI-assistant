@@ -8,6 +8,7 @@ import { formatDietaryTags, formatPreparationStep } from './recipeDisplay'
 import { fmtDateTime } from '../dashboard/dashboardUtils'
 import { devToolsEnabled } from '../devTools'
 import { apiGet, apiPost, apiRequest } from '../lib/apiClient'
+import { dateForPlanDay, pickVisibleDayIndex } from './mealPlanDate.util'
 import type {
   EnhancedRecipeNutrition,
   MealPlanListItem,
@@ -142,7 +143,12 @@ export function MealPlanDetail({
       })
       const active = versions.find((v) => v.isActive) ?? versions[0]
       setVersionId(active?.id ?? null)
-      setSelectedDay(0)
+      const dayIndexes = [
+        ...new Set((active?.meals ?? []).map((m) => m.dayIndex)),
+      ].sort((a, b) => a - b)
+      setSelectedDay(
+        pickVisibleDayIndex(dayIndexes, body.startDate, body.duration),
+      )
       setLocalDayOrder(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load meal plan')
@@ -631,6 +637,12 @@ export function MealPlanDetail({
                   onClick={() => setSelectedDay(d)}
                 >
                   Day {d + 1}
+                  {planDetail.duration === 'weekly' ? (
+                    <span className="dayTabDate">
+                      {' '}
+                      · {dateForPlanDay(planDetail.startDate, d).slice(5)}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>

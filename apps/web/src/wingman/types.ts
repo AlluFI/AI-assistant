@@ -27,6 +27,8 @@ export type WingmanUiBlock =
         | 'confirm_onboarding_ai_targets'
         | 'confirm_onboarding_formula_targets'
         | 'confirm_onboarding_meal_defaults'
+        | 'confirm_create_recipe'
+        | 'confirm_add_manual_meal'
         | 'open_record'
         | 'open_nutrition'
         | 'open_insights'

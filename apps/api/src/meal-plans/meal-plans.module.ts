@@ -20,6 +20,6 @@ import { MealPlanGenerationService } from './meal-plan-generation.service';
   ],
   controllers: [MealPlansController],
   providers: [MealPlansService, MealPlanGenerationService],
-  exports: [MealPlansService],
+  exports: [MealPlansService, MealPlanGenerationService],
 })
 export class MealPlansModule {}

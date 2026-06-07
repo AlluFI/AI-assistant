@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { OpenAiClientService } from '../ai/openai-client.service';
 import { NutritionService } from '../nutrition/nutrition.service';
@@ -11,9 +11,17 @@ import {
 } from '../shared/micronutrients';
 import { EnhancedNutritionService } from '../enhanced-nutrition/enhanced-nutrition.service';
 import { MacroNutrition } from '../shared/units';
+import { MealPlanGenerationService } from '../meal-plans/meal-plan-generation.service';
+import { newMealPlanId } from '../meal-plans/meal-plan-nutrition.util';
 import { RecipeSearchDto } from './dto/recipe-search.dto';
 import { ScaleRecipeDto } from './dto/scale-recipe.dto';
 import { SubstituteIngredientDto } from './dto/substitute-ingredient.dto';
+
+export type WingmanCreateRecipeInput = {
+  query: string;
+  meal?: string;
+  cuisine?: string;
+};
 
 @Injectable()
 export class RecipesService {
@@ -24,6 +32,7 @@ export class RecipesService {
     private readonly nutrition: NutritionService,
     private readonly openai: OpenAiClientService,
     private readonly enhancedNutrition: EnhancedNutritionService,
+    private readonly mealPlanGeneration: MealPlanGenerationService,
   ) {}
 
   async search(dto: RecipeSearchDto) {
@@ -203,6 +212,131 @@ export class RecipesService {
       dto.recipeId,
       dto.servings,
     );
+  }
+
+  /** AI-generate and persist a catalog recipe after Wingman user confirmation. */
+  async createFromWingmanRequest(userId: string, input: WingmanCreateRecipeInput) {
+    const query = input.query.trim();
+    if (!query) {
+      throw new BadRequestException('Recipe description is required');
+    }
+    if (query.length > 500) {
+      throw new BadRequestException('Recipe description is too long (max 500)');
+    }
+
+    const meal = input.meal?.trim().toLowerCase();
+    if (
+      meal &&
+      !['breakfast', 'lunch', 'dinner', 'snack'].includes(meal)
+    ) {
+      throw new BadRequestException('Invalid meal type');
+    }
+
+    const prefs = await this.mealPlanGeneration.buildPrefsFromProfile(userId);
+    const draft = await this.mealPlanGeneration.generateRecipeDraftFromQuery(
+      query,
+      prefs,
+      { meal, cuisine: input.cuisine?.trim() },
+    );
+
+    const recipeId = await this.persistGeneratedDraft(draft, 'wingman_confirmed');
+    void this.rag.ensureRecipeEmbedding(recipeId);
+
+    const full = await this.getById(recipeId);
+    return {
+      id: full.id,
+      title: full.title,
+      cuisine: full.cuisine,
+      meal: full.meal,
+      summary: full.summary,
+      timeMinutes: full.time,
+      nutrition: full.nutrition,
+      servings: full.servings,
+      ingredients: full.ingredients,
+      preparation: full.preparation,
+    };
+  }
+
+  private async persistGeneratedDraft(
+    draft: {
+      title: string;
+      cuisine: string;
+      meal: string;
+      servings: number;
+      summary: string;
+      timeMinutes: number;
+      difficultyLevel: string;
+      dietaryTags: string[];
+      ingredients: Array<{ name: string; quantityGrams: number }>;
+      preparation: string[];
+    },
+    source: string,
+  ): Promise<string> {
+    const recipeId = newMealPlanId();
+    await this.prisma.$transaction(async (tx) => {
+      const normalizedLines = new Map<
+        string,
+        { ingredientId: string; name: string; quantity: number }
+      >();
+      for (const line of draft.ingredients) {
+        const label = line.name.trim();
+        if (!label) continue;
+        const existing = await tx.ingredient.findFirst({
+          where: { label: { equals: label, mode: 'insensitive' } },
+        });
+        const ingredient =
+          existing ??
+          (await tx.ingredient.create({
+            data: {
+              id: newMealPlanId(),
+              label,
+              unit: 'gram',
+              quantity: 100,
+              nutrition: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+              } as unknown as Prisma.InputJsonValue,
+            },
+          }));
+        const key = ingredient.id;
+        const prev = normalizedLines.get(key);
+        normalizedLines.set(key, {
+          ingredientId: ingredient.id,
+          name: label,
+          quantity: (prev?.quantity ?? 0) + Math.max(1, line.quantityGrams),
+        });
+      }
+      if (!normalizedLines.size) {
+        throw new BadRequestException('Generated recipe has no ingredients');
+      }
+
+      await tx.recipe.create({
+        data: {
+          id: recipeId,
+          title: draft.title,
+          cuisine: draft.cuisine,
+          meal: draft.meal,
+          servings: draft.servings,
+          summary: draft.summary,
+          timeMinutes: draft.timeMinutes,
+          difficultyLevel: draft.difficultyLevel,
+          dietaryTags: draft.dietaryTags as unknown as Prisma.InputJsonValue,
+          source,
+          img: null,
+          preparation: draft.preparation as unknown as Prisma.InputJsonValue,
+          ingredients: {
+            create: [...normalizedLines.values()].map((line) => ({
+              ingredientId: line.ingredientId,
+              name: line.name,
+              quantity: line.quantity,
+            })),
+          },
+        },
+      });
+    });
+    return recipeId;
   }
 
   async substituteIngredient(

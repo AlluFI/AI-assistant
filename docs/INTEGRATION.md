@@ -25,7 +25,7 @@ Reviewers clone **this repo only**. It contains Parts 1–2 (wellness + nutritio
 | Meal photo vision | `apps/api/src/meal-photos/` | `apps/web/src/nutrition/MealPhotoLog.tsx` |
 | Nutrition + meal plans | `apps/api/src/meal-plans/`, `nutrition/` | `apps/web/src/nutrition/` |
 | Daily wellness (Today) | `apps/api/src/daily-wellness/` | `apps/web/src/dashboard/TodayDashboard.tsx`, etc. |
-| Meal plan dates / reapply | `apps/api/src/shared/meal-plan-date.util.ts`, `meal-plans/` | `PastMealPlansModal.tsx`, `NutritionPanel.tsx` |
+| Meal plan dates / reapply | `apps/api/src/shared/meal-plan-date.util.ts`, `meal-plans/` | `PastMealPlansModal.tsx`, `NutritionPanel.tsx`, `mealPlanDate.util.ts` (today-day tabs) |
 
 ## Historical note
 

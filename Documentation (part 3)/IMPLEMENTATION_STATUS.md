@@ -1,6 +1,6 @@
 # Part 3 — Implementation status vs requirements
 
-**Audit date:** 2026-05-28 (meal plan date validity, Today macros, token-aware wingman context, History UI)  
+**Audit date:** 2026-06-07 (Wingman catalog recipe create, weekly plan today-day default, Today UI polish)  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
 **Offline check:** `pnpm wingman:eval` → **18/18** routing heuristics pass (does not replace live LLM demo).
@@ -132,7 +132,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | `update_nutrition_targets` | ✅ | Nutrition targets |
 | `update_nutrition_preferences` | ✅ | Nutrition profile prefs |
 
-**Confirmed writes (UI only, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, `confirm_onboarding_skip`, `confirm_onboarding_ai_targets`, `confirm_onboarding_formula_targets`, `confirm_onboarding_meal_defaults` — see `docs/WINGMAN_ONBOARDING.md`.
+**Confirmed writes (UI only, not silent tools):** `confirm_log_activity`, `confirm_log_weight`, `confirm_regenerate_meal`, `confirm_generate_shopping_list`, `confirm_mark_meal_eaten`, `confirm_generate_meal_plan`, `confirm_create_recipe`, `confirm_onboarding_skip`, `confirm_onboarding_ai_targets`, `confirm_onboarding_formula_targets`, `confirm_onboarding_meal_defaults` — see `docs/WINGMAN_ONBOARDING.md`.
 
 ### Memory & context
 
@@ -179,6 +179,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Cross-session memory | ✅ | `docs/LONG_TERM_MEMORY.md` |
 | Wingman onboarding wizard | ✅ | `docs/WINGMAN_ONBOARDING.md`, `GET/POST /assistant/onboarding` |
 | Daily check-in → wellness | ✅ | `check-in-wellness.util.ts`, Overview gauge **Check-in (7d)** |
+| Wingman catalog recipe create | ✅ | `confirm_create_recipe`, `RecipesService.createFromWingmanRequest` |
 
 ---
 

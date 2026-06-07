@@ -2,7 +2,7 @@
 
 Fast pass/fail for reviewers and self-review before submission.  
 Mark `[x]` when **verified in your environment** (live demo or test).  
-**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for token-aware context, History UI, meal plan date validity, Today macros overview.
+**Code audit (2026-06-07):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for Wingman `confirm_create_recipe`, weekly meal plan today-day tabs, Today card UI.
 
 **Detailed criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **API/UI steps:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md)

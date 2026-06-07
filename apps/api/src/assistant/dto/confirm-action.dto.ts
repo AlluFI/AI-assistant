@@ -12,6 +12,8 @@ const ACTIONS = [
   'confirm_onboarding_ai_targets',
   'confirm_onboarding_formula_targets',
   'confirm_onboarding_meal_defaults',
+  'confirm_create_recipe',
+  'confirm_add_manual_meal',
 ] as const;
 
 export class ConfirmAssistantActionDto {

@@ -6,7 +6,6 @@ type Props = {
   busy?: boolean
   onLogWeight?: () => void
   onLogActivity?: () => void
-  onViewNutrition?: () => void
 }
 
 function macroRing(pct: number, color?: string, size: 'md' | 'sm' = 'md') {
@@ -41,7 +40,6 @@ export function TodayDashboard({
   busy,
   onLogWeight,
   onLogActivity,
-  onViewNutrition,
 }: Props) {
   const n = today?.nutrition
   const targetCal = n?.target.calories ?? 2000
@@ -55,11 +53,6 @@ export function TodayDashboard({
           <h2>Today</h2>
           <p className="hint">{today?.date ?? new Date().toISOString().slice(0, 10)}</p>
         </div>
-        {onViewNutrition ? (
-          <button type="button" className="secondary" onClick={onViewNutrition}>
-            Nutrition
-          </button>
-        ) : null}
       </div>
 
       {busy && !today ? (

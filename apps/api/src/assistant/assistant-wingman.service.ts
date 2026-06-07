@@ -34,6 +34,8 @@ import {
   type WingmanHistoryTurn,
 } from './wingman-context.util';
 import {
+  parseAddManualMealIntent,
+  parseCreateRecipeIntent,
   parseGenerateMealPlanIntent,
   parseLogActivityIntent,
   parseLogWeightIntent,
@@ -41,6 +43,10 @@ import {
   parseRegenerateMealIntent,
   parseShoppingListIntent,
 } from './wingman-intent';
+import {
+  buildCreateRecipeCta,
+  inferCreateRecipeCta,
+} from './wingman-create-recipe.util';
 import type { WingmanCoachingMode } from './prompts/coaching-mode';
 import type { AssistantUiBlock } from './assistant-ui.types';
 import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
@@ -48,6 +54,17 @@ import { ThreadSummaryService } from './thread-summary.service';
 
 const MEDICAL_URGENT =
   /chest\s+pain|heart\s+attack|stroke|can't\s+breathe|cannot\s+breathe|severe\s+pain|fainting|passed\s+out/i;
+
+function defaultMealScheduledAt(date: string, mealType: string): string {
+  const times: Record<string, string> = {
+    breakfast: '08:00',
+    lunch: '12:30',
+    dinner: '19:00',
+    snack: '15:00',
+  };
+  const time = times[mealType] ?? '12:00';
+  return `${date.slice(0, 10)}T${time}:00.000Z`;
+}
 
 @Injectable()
 export class AssistantWingmanService {
@@ -269,6 +286,11 @@ export class AssistantWingmanService {
       });
     }
 
+    const createRecipeCta = inferCreateRecipeCta(userMessage, traceResults);
+    if (createRecipeCta) {
+      uiBlocks.push(createRecipeCta);
+    }
+
     return {
       content,
       uiBlocks: uiBlocks.length ? uiBlocks : undefined,
@@ -411,6 +433,50 @@ export class AssistantWingmanService {
           mealSlot.date,
           meal,
         ),
+      };
+    }
+
+    const addManual = parseAddManualMealIntent(userMessage);
+    if (addManual) {
+      const today = new Date().toISOString().slice(0, 10);
+      const plan = (await this.tools.execute(userId, 'get_meal_plan', {
+        date: today,
+      })) as {
+        error?: string;
+        versionId?: string;
+        date?: string;
+        dayIndex?: number;
+        duration?: string;
+        startDate?: string;
+      };
+      if (plan.error || !plan.versionId) {
+        return {
+          content:
+            'I could not find a meal plan that covers today. Open the Nutrition tab to generate or reapply a plan, then try again.',
+          uiBlocks: [
+            { type: 'cta', label: 'Open Nutrition tab', action: 'open_nutrition' },
+          ],
+        };
+      }
+      const planDate = plan.date ?? today;
+      const dayIndex = plan.dayIndex ?? 0;
+      const scheduledAt = defaultMealScheduledAt(planDate, addManual.mealType);
+      return {
+        content: `I can add **${addManual.title}** as **${addManual.mealTypeLabel}** on today's meal plan (${plan.duration ?? 'plan'}). Confirm to save it — nothing changes until you approve.`,
+        uiBlocks: [
+          {
+            type: 'cta',
+            label: `Confirm: Add ${addManual.mealTypeLabel}`,
+            action: 'confirm_add_manual_meal',
+            payload: {
+              versionId: plan.versionId,
+              dayIndex,
+              mealType: addManual.mealType,
+              title: addManual.title,
+              scheduledAt,
+            },
+          },
+        ],
       };
     }
 
@@ -558,6 +624,19 @@ export class AssistantWingmanService {
               duration: generatePlan.duration,
             },
           },
+        ],
+      };
+    }
+
+    const createRecipe = parseCreateRecipeIntent(userMessage);
+    if (createRecipe) {
+      return {
+        content: `I can generate and save a new catalog recipe for **${createRecipe.query}** (ingredients, steps, and nutrition from your profile preferences). Confirm to add it to the database — nothing is saved until you approve.`,
+        uiBlocks: [
+          buildCreateRecipeCta({
+            query: createRecipe.query,
+            meal: createRecipe.meal,
+          }),
         ],
       };
     }

@@ -234,7 +234,7 @@ export const ASSISTANT_TOOL_DEFINITIONS = [
     function: {
       name: 'search_recipes',
       description:
-        'Search the recipe catalog by keywords, cuisine, meal type, prep time, or macros. Returns ranked matches with nutrition per serving.',
+        'Search the recipe catalog by keywords, cuisine, meal type, prep time, or macros. Returns ranked matches with nutrition per serving. If count is 0, offer to create and save a new recipe (user must confirm — never invent catalog entries).',
       parameters: {
         type: 'object',
         properties: {

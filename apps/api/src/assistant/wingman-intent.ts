@@ -1,4 +1,5 @@
 import { ACTIVITY_TYPES } from '../profile/activity-catalog';
+import { extractCreateRecipeQuery } from './wingman-create-recipe.util';
 
 export type ParsedActivityLog = {
   activityType: string;
@@ -209,6 +210,47 @@ export function parseMarkMealEatenIntent(text: string): ParsedMarkMealEaten | nu
   return null;
 }
 
+export type ParsedAddManualMeal = {
+  title: string;
+  mealType: string;
+  mealTypeLabel: string;
+};
+
+/** "Add a protein shake to my meal plan", "add afternoon snack to today's plan". */
+export function parseAddManualMealIntent(text: string): ParsedAddManualMeal | null {
+  const lower = text.toLowerCase();
+  if (!/\b(add|insert|include)\b/i.test(lower)) return null;
+  if (
+    !/\b(meal plan|my plan|today'?s plan|todays plan)\b/i.test(lower) &&
+    !/\b(breakfast|lunch|dinner|snack|tonight|meal)\b/i.test(lower)
+  ) {
+    return null;
+  }
+
+  let mealType = 'snack';
+  let mealTypeLabel = 'Snack';
+  for (const [phrase, type] of Object.entries(MEAL_ALIASES)) {
+    if (lower.includes(phrase)) {
+      mealType = type;
+      mealTypeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+      break;
+    }
+  }
+
+  const quoted = text.match(/["“]([^"”]+)["”]/);
+  const named = text.match(/\b(?:called|named|titled)\s+(.+?)(?:\s+to|\s+for|\s+on|$)/i);
+  const addMatch = text.match(
+    /\badd\s+(?:a\s+|an\s+)?(.+?)\s+(?:to|on|into)\s+(?:my\s+)?(?:today'?s\s+)?(?:meal\s+)?plan/i,
+  );
+  const title = (quoted?.[1] ?? named?.[1] ?? addMatch?.[1])
+    ?.trim()
+    .replace(/[.?!]+$/, '');
+  if (!title || title.length < 2) return null;
+  if (/^(a\s+)?(meal|snack)$/i.test(title)) return null;
+
+  return { title, mealType, mealTypeLabel };
+}
+
 export type ParsedGenerateMealPlan = {
   duration: 'daily' | 'weekly';
   startDate: string;
@@ -233,4 +275,26 @@ export function parseGenerateMealPlanIntent(
     duration: weekly ? 'weekly' : 'daily',
     startDate,
   };
+}
+
+export type ParsedCreateRecipe = {
+  query: string;
+  meal?: string;
+};
+
+/** "Create a recipe for high-protein vegan buddha bowl", "save X to the recipe catalog". */
+export function parseCreateRecipeIntent(text: string): ParsedCreateRecipe | null {
+  const query = extractCreateRecipeQuery(text);
+  if (!query) return null;
+  if (!/\b(recipe|catalog|database)\b/i.test(text)) return null;
+
+  const lower = text.toLowerCase();
+  let meal: string | undefined;
+  for (const [phrase, mealType] of Object.entries(MEAL_ALIASES)) {
+    if (lower.includes(phrase)) {
+      meal = mealType;
+      break;
+    }
+  }
+  return { query, meal };
 }

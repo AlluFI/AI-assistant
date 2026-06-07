@@ -17,8 +17,8 @@ import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
 import {
   dayIndexForPlanDate,
   dateForPlanDay,
-  planCoversDate,
 } from '../shared/meal-plan-date.util';
+import { pickMealPlanForDate } from '../shared/meal-plan-resolve.util';
 import {
   averageCheckInScore,
   dayCheckInScore,
@@ -248,7 +248,7 @@ export class AssistantToolsService {
       orderBy: { updatedAt: 'desc' },
       include: {
         versions: {
-          where: { isActive: true },
+          orderBy: [{ isActive: 'desc' }, { versionNumber: 'desc' }],
           take: 1,
           include: {
             meals: {
@@ -264,12 +264,7 @@ export class AssistantToolsService {
       },
     });
 
-    const plan = plans.find(
-      (row) =>
-        !isHiddenDemoMealPlanId(row.id) &&
-        row.versions[0] &&
-        planCoversDate(row.startDate, row.duration, date),
-    );
+    const plan = pickMealPlanForDate(plans, date, isHiddenDemoMealPlanId);
 
     if (!plan?.versions[0]) {
       return {
@@ -831,6 +826,7 @@ export class AssistantToolsService {
     return {
       query: query || null,
       count: results.length,
+      canCreateRecipe: results.length === 0,
       recipes: results.map((r) => ({
         id: r.id,
         title: r.title,

@@ -134,6 +134,8 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 | `POST` | `/api/meal-plans/versions/:versionId/confirm-recipes` | Persist AI recipe drafts |
 | `POST` | `/api/meal-plans/:planId/versions/:versionId/restore` | Restore version |
 
+**UI:** Weekly **Meal plan detail** opens on the day tab matching today (`mealPlanDate.util.ts`); day tabs show `Day N · MM-DD`.
+
 ---
 
 ## 10) Shopping lists (UI: View shopping lists / Create shopping list)

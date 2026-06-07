@@ -5,7 +5,8 @@ import { weeklyActiveDaysFromLogs } from '../analytics/activity-week.util';
 import { NutritionAnalyticsService } from '../nutrition-analytics/nutrition-analytics.service';
 import { isHiddenDemoMealPlanId } from '../shared/demo-meal-plan.util';
 import { NutritionService } from '../nutrition/nutrition.service';
-import { dayIndexForPlanDate, planCoversDate } from '../shared/meal-plan-date.util';
+import { dayIndexForPlanDate } from '../shared/meal-plan-date.util';
+import { pickMealPlanForDate } from '../shared/meal-plan-resolve.util';
 import type { MacroNutrition } from '../shared/units';
 import {
   computeAdherence,
@@ -85,7 +86,7 @@ export class TodayService {
       orderBy: { updatedAt: 'desc' },
       include: {
         versions: {
-          where: { isActive: true },
+          orderBy: [{ isActive: 'desc' }, { versionNumber: 'desc' }],
           take: 1,
           include: {
             meals: {
@@ -99,12 +100,7 @@ export class TodayService {
       },
     });
 
-    const plan = plans.find(
-      (p) =>
-        !isHiddenDemoMealPlanId(p.id) &&
-        p.versions[0] &&
-        planCoversDate(p.startDate, p.duration, today),
-    );
+    const plan = pickMealPlanForDate(plans, today, isHiddenDemoMealPlanId);
     if (!plan?.versions[0]) return null;
 
     const dayIndex = dayIndexForPlanDate(

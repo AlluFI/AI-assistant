@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiGet, apiPost } from '../lib/apiClient'
+import { dateForPlanDay, pickVisibleDayIndex } from './mealPlanDate.util'
 import type { MealPlanVersionDetail } from './types'
 
 type PlanMealOption = {
@@ -46,12 +47,6 @@ type Props = {
   onCancel: () => void
   setMessage: (v: string) => void
   setError: (v: string) => void
-}
-
-function formatPlanDay(startDate: string, dayIndex: number): string {
-  const d = new Date(`${startDate}T12:00:00.000Z`)
-  d.setUTCDate(d.getUTCDate() + dayIndex)
-  return d.toISOString().slice(0, 10)
 }
 
 function mealTypeLabel(mealType: string): string {
@@ -118,16 +113,12 @@ export function RecipeMealSwapPanel({
       }
       setMealsByDay(byDay)
 
-      const today = new Date().toISOString().slice(0, 10)
-      let defaultDay = 0
-      if (body.duration === 'weekly') {
-        for (let d = 0; d < 7; d++) {
-          if (formatPlanDay(body.startDate, d) === today) {
-            defaultDay = d
-            break
-          }
-        }
-      }
+      const dayIndexes = [...byDay.keys()].sort((a, b) => a - b)
+      const defaultDay = pickVisibleDayIndex(
+        dayIndexes,
+        body.startDate,
+        body.duration,
+      )
       setSelectedDay(defaultDay)
       const dayMeals = byDay.get(defaultDay) ?? []
       setSelectedMealId(dayMeals[0]?.id ?? null)
@@ -271,12 +262,12 @@ export function RecipeMealSwapPanel({
               disabled={disabled}
               onClick={() => setSelectedDay(d)}
             >
-              {formatPlanDay(startDate, d).slice(5)}
+              {dateForPlanDay(startDate, d).slice(5)}
             </button>
           ))}
         </div>
       ) : (
-        <p className="hint recipeSwapDayLabel">Day: {formatPlanDay(startDate, 0)}</p>
+        <p className="hint recipeSwapDayLabel">Day: {dateForPlanDay(startDate, 0)}</p>
       )}
 
       <p className="recipeSwapSectionLabel">Which meal should this replace?</p>

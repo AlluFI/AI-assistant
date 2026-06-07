@@ -287,6 +287,117 @@ Required JSON shape:
     }
   }
 
+  /** Generate a full recipe draft from a free-text catalog search request (Wingman). */
+  async generateRecipeDraftFromQuery(
+    query: string,
+    prefs: Record<string, unknown>,
+    opts?: { meal?: string; cuisine?: string },
+  ) {
+    const mealType = (opts?.meal ?? 'dinner').trim().toLowerCase();
+    const title = query.trim().slice(0, 120) || 'Custom recipe';
+    const fallback = await this.generateRecipeDraftForMeal(
+      {
+        title,
+        mealType,
+        nutrition: { calories: 0, protein: 0, carbs: 0, fats: 0 },
+      },
+      prefs,
+    );
+    if (!this.openai.apiKey) return fallback;
+    try {
+      const generated = await this.openai.chatJson<{
+        title: string;
+        cuisine: string;
+        meal: string;
+        servings: number;
+        summary: string;
+        timeMinutes: number;
+        difficultyLevel: string;
+        dietaryTags: string[];
+        ingredients: Array<{ name: string; quantityGrams: number }>;
+        preparation: string[];
+      }>(
+        'You generate complete recipe JSON for a wellness app catalog. Return strict JSON only.',
+        `Create a complete recipe matching this user request.
+Request: ${query.trim()}
+Preferred meal type: ${mealType}
+Preferred cuisine: ${opts?.cuisine ?? 'infer from request'}
+User preferences: ${JSON.stringify({
+          dietary_preferences: prefs.dietary_preferences ?? [],
+          dietary_restrictions: prefs.dietary_restrictions ?? [],
+          cuisine_preferences: prefs.cuisine_preferences ?? [],
+          disliked_ingredients: prefs.disliked_ingredients ?? [],
+        })}
+Respect dietary restrictions. Include realistic ingredient quantities in grams.
+Required JSON shape:
+{
+  "title": "string",
+  "cuisine": "string",
+  "meal": "string",
+  "servings": 1,
+  "summary": "string",
+  "timeMinutes": 25,
+  "difficultyLevel": "easy|medium|hard",
+  "dietaryTags": ["string"],
+  "ingredients": [{"name":"string","quantityGrams":120}],
+  "preparation": ["step 1", "step 2"]
+}`,
+        { temperature: 0.7, topP: 0.95 },
+      );
+      const ingredients = Array.isArray(generated.ingredients)
+        ? generated.ingredients
+            .filter((line) => typeof line?.name === 'string')
+            .map((line) => ({
+              name: line.name.trim(),
+              quantityGrams: Math.max(
+                1,
+                Math.round(Number(line.quantityGrams ?? 100)),
+              ),
+            }))
+            .filter((line) => line.name.length > 0)
+        : [];
+      const prep = Array.isArray(generated.preparation)
+        ? generated.preparation
+            .filter(
+              (step): step is string =>
+                typeof step === 'string' && step.trim().length > 0,
+            )
+            .slice(0, 10)
+        : [];
+      return {
+        title: (generated.title || title).trim(),
+        cuisine: (generated.cuisine || opts?.cuisine || fallback.cuisine).trim(),
+        meal: (generated.meal || mealType).trim().toLowerCase(),
+        servings: Math.max(1, Math.round(Number(generated.servings ?? 1))),
+        summary:
+          typeof generated.summary === 'string' && generated.summary.trim()
+            ? generated.summary.trim()
+            : fallback.summary,
+        timeMinutes: Math.max(
+          5,
+          Math.round(Number(generated.timeMinutes ?? 25)),
+        ),
+        difficultyLevel:
+          generated.difficultyLevel === 'medium' ||
+          generated.difficultyLevel === 'hard'
+            ? generated.difficultyLevel
+            : 'easy',
+        dietaryTags: Array.isArray(generated.dietaryTags)
+          ? generated.dietaryTags
+              .filter(
+                (tag): tag is string =>
+                  typeof tag === 'string' && tag.trim().length > 0,
+              )
+              .slice(0, 8)
+          : fallback.dietaryTags,
+        ingredients: ingredients.length ? ingredients : fallback.ingredients,
+        preparation: prep.length ? prep : fallback.preparation,
+      };
+    } catch {
+      return fallback;
+    }
+  }
+
   async assignRecipeToSlot(
     slot: MealSlot,
     prefs: Record<string, unknown>,

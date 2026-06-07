@@ -71,6 +71,8 @@ Writes use rule parsing and/or scripted CTAs + UI confirm before the database ch
 | `confirm_generate_shopping_list` | Shopping list from plan |
 | `confirm_mark_meal_eaten` | Mark plan slot eaten |
 | `confirm_generate_meal_plan` | New meal plan |
+| `confirm_create_recipe` | AI-generate and save a catalog recipe (after empty search or explicit request; uses `OPENAI_API_KEY` for draft quality) |
+| `confirm_add_manual_meal` | Add a manual meal slot to today's plan |
 | `confirm_onboarding_skip` | Dismiss setup wizard |
 | `confirm_onboarding_ai_targets` | AI nutrition targets in onboarding |
 | `confirm_onboarding_formula_targets` | Formula targets in onboarding |

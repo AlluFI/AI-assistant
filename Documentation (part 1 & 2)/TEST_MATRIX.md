@@ -123,7 +123,7 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 | `POST` | `/api/food-log/quick` | Recipe or ingredient → `MealIntakeLog` |
 | `GET` | `/api/food-log/recent?limit=8` | Recent intake logs |
 
-**UI smoke:** Overview → **Today** card → **Quick food log** → **Daily check-in** (optional steps) → optional wearable demo → switch to **Weight & activity** when reminders show.
+**UI smoke:** Overview → **Today** card (macros, next meal; use top **Nutrition** tab) → **Quick food log** → **Daily check-in** (optional steps) → optional wearable demo → switch to **Weight & activity** when reminders show.
 
 ---
 

@@ -5,6 +5,7 @@ import { NutritionModule } from '../nutrition/nutrition.module';
 import { RagModule } from '../rag/rag.module';
 import { NutritionToolsModule } from '../nutrition-tools/nutrition-tools.module';
 import { EnhancedNutritionModule } from '../enhanced-nutrition/enhanced-nutrition.module';
+import { MealPlansModule } from '../meal-plans/meal-plans.module';
 import { RecipesController } from './recipes.controller';
 import { RecipesService } from './recipes.service';
 
@@ -16,6 +17,7 @@ import { RecipesService } from './recipes.service';
     EnhancedNutritionModule,
     AiModule,
     NutritionModule,
+    MealPlansModule,
   ],
   controllers: [RecipesController],
   providers: [RecipesService],
