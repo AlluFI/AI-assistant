@@ -275,8 +275,7 @@ Reviewers clone this repo, run Docker (or local dev), and verify mandatory crite
 
 ### Documentation & setup
 
-- README contains clear overview, setup, and usage for the **full** app (Parts 1–3).
-- Documentation includes: system prompt strategy, model rationale, conversation management, error handling, function-calling details.
+- README contains clear overview, setup, and usage for the **full** app (Parts 1–3). Documentation includes: system prompt strategy, model rationale, conversation management, error handling, function-calling details.
 - Assistant can access and summarize complete health profile data (BMI, weight, wellness score, activity, goals).
 - Assistant **must not** expose sensitive PII beyond user's **name** (no email, DOB, credentials, other users).
 - Multi-metric questions return unified narrative (e.g. weight + BMI together).
