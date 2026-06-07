@@ -116,7 +116,7 @@ UI: combined progress chart toggles weight / wellness / BMI / activity; range se
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `GET` | `/api/today` | Calories left, protein %, next meal, reminders, adherence, streaks |
+| `GET` | `/api/today` | Calories left, **macros today** (protein/carbs/fats), next meal (plan covering today), reminders, adherence, streaks |
 | `PUT` | `/api/daily-check-in` | Sleep, water (glasses), mood (1–5), optional `steps` |
 | `GET` | `/api/daily-check-in?date=YYYY-MM-DD` | Read check-in |
 | `POST` | `/api/daily-check-in/wearable-demo` | Demo steps + sleep import |

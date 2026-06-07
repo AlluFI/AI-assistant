@@ -29,6 +29,11 @@ import {
 } from './weekly-meal-plan-format.util';
 import { buildWingmanSystemPrompt } from './prompts/system-prompt';
 import {
+  buildTokenAwareHistory,
+  resolveWingmanContextBudget,
+  type WingmanHistoryTurn,
+} from './wingman-context.util';
+import {
   parseGenerateMealPlanIntent,
   parseLogActivityIntent,
   parseLogWeightIntent,
@@ -39,6 +44,7 @@ import {
 import type { WingmanCoachingMode } from './prompts/coaching-mode';
 import type { AssistantUiBlock } from './assistant-ui.types';
 import { WingmanOnboardingService } from './onboarding/wingman-onboarding.service';
+import { ThreadSummaryService } from './thread-summary.service';
 
 const MEDICAL_URGENT =
   /chest\s+pain|heart\s+attack|stroke|can't\s+breathe|cannot\s+breathe|severe\s+pain|fainting|passed\s+out/i;
@@ -52,6 +58,7 @@ export class AssistantWingmanService {
     private readonly llm: WingmanLlmFacade,
     private readonly userMemory: UserMemoryService,
     private readonly onboarding: WingmanOnboardingService,
+    private readonly threadSummary: ThreadSummaryService,
   ) {}
 
   llmAvailable(): boolean {
@@ -99,7 +106,7 @@ export class AssistantWingmanService {
       };
     }
 
-    const ctx = await this.buildLlmContext(userId, threadId, obStatus);
+    const ctx = await this.buildLlmContext(userId, threadId, userMessage, obStatus);
 
     const traceResults: Array<{
       name: string;
@@ -172,7 +179,7 @@ export class AssistantWingmanService {
       return;
     }
 
-    const ctx = await this.buildLlmContext(userId, threadId, obStatus);
+    const ctx = await this.buildLlmContext(userId, threadId, userMessage, obStatus);
     const traceResults: Array<{
       name: string;
       args: Record<string, unknown>;
@@ -276,6 +283,7 @@ export class AssistantWingmanService {
   private async buildLlmContext(
     userId: string,
     threadId: string,
+    pendingUserMessage: string,
     obStatus?: Awaited<ReturnType<WingmanOnboardingService['getStatus']>>,
   ) {
     const user = await this.prisma.user.findUnique({
@@ -315,20 +323,44 @@ export class AssistantWingmanService {
       system += `\n\n## Long-term memory (across all chats — use only when relevant to this question; do not recite in every reply)\n${longTerm}`;
     }
 
-    const prior = await this.prisma.assistantMessage.findMany({
-      where: { threadId },
-      orderBy: { createdAt: 'asc' },
-      take: 12,
-    });
-    const history = prior
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .slice(-10)
-      .map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }));
+    const maxMessages = Number(
+      this.config.get<string>('ASSISTANT_CONTEXT_MAX_MESSAGES') ?? 120,
+    );
+    const fetchLimit =
+      Number.isFinite(maxMessages) && maxMessages >= 10
+        ? Math.min(300, Math.max(10, maxMessages))
+        : 120;
 
-    return { system, history };
+    const priorRows = await this.prisma.assistantMessage.findMany({
+      where: { threadId },
+      orderBy: { createdAt: 'desc' },
+      take: fetchLimit,
+      select: { role: true, content: true },
+    });
+
+    const chronological = priorRows.reverse();
+    const candidateTurns: WingmanHistoryTurn[] = [];
+    for (const row of chronological) {
+      if (row.role !== 'user' && row.role !== 'assistant') continue;
+      candidateTurns.push({
+        role: row.role,
+        content: row.content,
+      });
+    }
+
+    const budget = resolveWingmanContextBudget(this.config);
+    const trimmed = buildTokenAwareHistory(
+      candidateTurns,
+      system,
+      pendingUserMessage,
+      budget,
+    );
+
+    if (trimmed.droppedTurns > 0 && !threadRow?.summary?.trim()) {
+      void this.threadSummary.maybeUpdate(threadId);
+    }
+
+    return { system, history: trimmed.history };
   }
 
   private async tryStaticReply(

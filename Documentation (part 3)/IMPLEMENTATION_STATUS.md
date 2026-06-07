@@ -1,6 +1,6 @@
 # Part 3 — Implementation status vs requirements
 
-**Audit date:** 2026-06-05 (onboarding, check-in wellness, planned-meal nutrients, bootstrap cleanup)  
+**Audit date:** 2026-05-28 (meal plan date validity, Today macros, token-aware wingman context, History UI)  
 **Criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **Detailed compliance (local, gitignored):** `COMPLIANCE_REPORT.md` in this folder — same format as Part 2.  
 **Offline check:** `pnpm wingman:eval` → **18/18** routing heuristics pass (does not replace live LLM demo).
@@ -19,7 +19,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Mandatory — documentation | ✅ |
 | Extra — Docker one-command | ✅ |
 | Extra — NL charts in chat | ✅ |
-| Extra — thread summarization (10+ turns) | ✅ (LLM + rule fallback) |
+| Extra — thread summarization (long threads) | ✅ (LLM + rule fallback from 8+ msgs) |
 | Bonus — streaming | ✅ |
 | Bonus — meal photo vision (Gemini) | ✅ |
 | Bonus — eval harness | ✅ |
@@ -34,7 +34,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 
 | Requirement | Status | Evidence |
 |---------------|--------|----------|
-| Follow-up questions | ✅ | Last 10 turns + thread summary in prompt; manual demo |
+| Follow-up questions | ✅ | Token-trimmed history + thread summary in prompt; manual demo |
 | Context from earlier in thread | ✅ | `AssistantMessage` persistence; `GET .../threads/:id` |
 | Digestible formatting | ✅ | System prompt: bullets, bold metrics, modes |
 
@@ -93,10 +93,10 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 
 | Layer | Status | Location |
 |-------|--------|----------|
-| Chat UI, history, streaming | ✅ | `apps/web/src/wingman/` |
+| Chat UI, history, streaming | ✅ | `apps/web/src/wingman/` — History panel, New chat, thread switch |
 | Input validation (empty, max 8k) | ✅ | `PostAssistantMessageDto` |
 | Persist threads/messages | ✅ | Prisma `AssistantThread`, `AssistantMessage` |
-| Context (summary, profile, memory) | ✅ | `assistant-wingman.service.ts`, `UserMemoryService` |
+| Context (summary, profile, memory) | ✅ | `assistant-wingman.service.ts`, `wingman-context.util.ts`, `UserMemoryService` |
 | LLM + tool loop | ✅ | `WingmanLlmFacade`, `assistant-tools.service.ts` |
 | JWT-scoped data access | ✅ | All tools use `userId` from JWT |
 | Structured errors (missing data) | ✅ | Tools return errors; prompt forbids inventing numbers |
@@ -138,9 +138,9 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 
 | Requirement | Status | Evidence |
 |---------------|--------|----------|
-| ≥5 turns context | ✅ | 10 messages in prompt |
+| ≥5 turns context | ✅ | Token budget (`ASSISTANT_CONTEXT_*`) + min 4 turns when possible |
 | Key facts (goals, restrictions) | ✅ | `AssistantUserMemory` — `docs/LONG_TERM_MEMORY.md` |
-| Thread summary when long | ✅ | `ThreadSummaryService` at 12+ messages (`ASSISTANT_SUMMARY_MODE=llm`) |
+| Thread summary when long | ✅ | `ThreadSummaryService` from **8+** messages (`ASSISTANT_SUMMARY_MODE=llm`) |
 | Units kg, cm, kcal, g | ✅ | System prompt |
 | Concise vs detailed | ✅ | `ASSISTANT_RESPONSE_MODE` |
 
@@ -150,7 +150,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 |-------|--------|-----|
 | Model choice rationale | ✅ | `docs/STACK.md`, `docs/PROMPT_ENGINEERING.md` |
 | Temperature / top_p | ✅ | Documented (~0.4 / 0.95) |
-| Token windowing | ✅ | Summary + last N turns |
+| Token windowing | ✅ | `wingman-context.util.ts` — estimated token budget, not fixed turn count |
 | LLM outage fallback | 🟡 | Rule-based paths when provider unset; limited template fallback |
 | Boundaries messaging | ✅ | `GET /assistant/bootstrap` readiness + disabled message |
 
@@ -163,7 +163,7 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Docker one command | ✅ | `pnpm compose:up` |
 | NL → line / bar / pie charts | ✅ | `get_chart_data` enums + `chart-ui-blocks.util.ts` |
 | Proactive chart offer | ✅ | System prompt: "Would you like to see a chart?" |
-| History compression 10+ turns | ✅ | Summary at 12+ messages |
+| History compression 10+ turns | ✅ | Token trim + summary from 8+ messages |
 | Dynamic context by topic | 🟡 | Coaching modes + summary; not a separate router |
 
 ---
@@ -190,9 +190,9 @@ Legend: ✅ Implemented · 🟡 Partial / needs live verification · ⬜ Not sta
 | Health + nutrition via assistant | ✅ | Needs `ANTHROPIC_API_KEY` or OpenAI wingman provider |
 | Six conversation types | 🟡 | Verify live with demo user |
 | Multi-turn + PII + medical | ✅ | Rules + prompt; demo chest pain / email |
-| History persist close/reopen | ✅ | Thread list reloads from API |
+| History persist close/reopen | ✅ | Thread list + History panel; reload from `GET /assistant/threads` |
 | Input validation | ✅ | `@MaxLength(8000)`, `@IsNotEmpty` |
-| ≥4 tools, ≥5 turns | ✅ | 11 tools; 10-turn window |
+| ≥4 tools, ≥5 turns | ✅ | 11 tools; token-aware context window |
 | Jailbreak resistance | 🟡 | Prompt + auth scope; demo other-user prompts |
 | Student explains model choices | ✅ | Documented; prepare verbal summary |
 
@@ -221,6 +221,9 @@ ASSISTANT_ENABLED=true
 ASSISTANT_STREAMING=true
 ASSISTANT_SUMMARY_MODE=llm
 ASSISTANT_MEMORY_ENABLED=true
+# Token-aware context (see docs/PROMPT_ENGINEERING.md)
+ASSISTANT_CONTEXT_TOKEN_BUDGET=12000
+ASSISTANT_CONTEXT_REPLY_RESERVE=2500
 GEMINI_API_KEY=             # optional — meal photos on Nutrition tab
 ```
 

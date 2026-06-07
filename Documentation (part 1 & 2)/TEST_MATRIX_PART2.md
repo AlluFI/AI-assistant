@@ -120,12 +120,15 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `GET` | `/api/meal-plans` | List plans |
+| `GET` | `/api/meal-plans` | List plans; each item includes `startDate`, `endDate`, `coversToday`, `isExpired` |
+| `GET` | `/api/meal-plans/history` | Expired plans only (`?q=` optional search) |
+| `POST` | `/api/meal-plans/:planId/reapply` | Body `{ startDate }` — reactivate latest version from new start date |
 | `POST` | `/api/meal-plans/generate` | Daily/weekly; 3-step generation + `generationSteps` |
 | `GET` | `/api/meal-plans/:id` | Plan + versions + meals |
 | `POST` | `/api/meal-plans/versions/:versionId/swap` | Swap slots (incl. cross-day) |
 | `POST` | `/api/meal-plans/versions/:versionId/reorder` | Reorder within day |
 | `POST` | `/api/meal-plans/versions/:versionId/meals/:mealId/regenerate` | Regenerate one meal |
+| `POST` | `/api/meal-plans/versions/:versionId/meals/:mealId/replace-recipe` | Swap slot to another catalog recipe |
 | `POST` | `/api/meal-plans/versions/:versionId/meals/:mealId/alternative` | Pick alternative |
 | `POST` | `/api/meal-plans/versions/:versionId/meals` | Manual meal add |
 | `POST` | `/api/meal-plans/versions/:versionId/confirm-recipes` | Persist AI recipe drafts |
@@ -162,7 +165,7 @@ Seed data: `pnpm nutrition:seed` (≥500 ingredients + recipes).
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `GET` | `/api/today` | Today dashboard aggregate |
+| `GET` | `/api/today` | Today dashboard aggregate (macros, next meal from plan covering today) |
 | `PUT` | `/api/daily-check-in` | Sleep, water, mood; optional `steps` |
 | `POST` | `/api/daily-check-in/wearable-demo` | Demo wearable sync |
 | `POST` | `/api/food-log/quick` | Quick log (recipe or ingredient) |

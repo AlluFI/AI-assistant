@@ -15,7 +15,7 @@ export class ThreadSummaryService {
     const count = await this.prisma.assistantMessage.count({
       where: { threadId },
     });
-    if (count < 12) return;
+    if (count < 8) return;
 
     const messages = await this.prisma.assistantMessage.findMany({
       where: { threadId },

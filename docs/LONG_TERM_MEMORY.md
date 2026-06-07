@@ -1,6 +1,15 @@
 # Long-term wingman memory
 
-Cross-session memory persists **per user** (not per chat thread). It complements **thread memory** (`AssistantThread.summary`), which only covers the current conversation.
+Cross-session memory persists **per user** (not per chat thread). It complements **thread memory** (`AssistantThread.summary` + token-trimmed recent turns), which only covers the current conversation.
+
+## Thread vs cross-session UI
+
+| UI control | Scope | API |
+|------------|-------|-----|
+| **History** (Wingman header) | Past chat threads — list, switch, **New chat** | `GET /api/assistant/threads` |
+| **Memory** (Wingman panel) | Long-term preferences/goals across threads | `GET/DELETE /api/assistant/memory` |
+
+Do not confuse thread History with cross-session Memory.
 
 ## Storage
 
@@ -22,7 +31,7 @@ Consolidation uses:
 
 ## Prompt injection
 
-`buildLlmContext` adds a **Long-term memory** section to the system prompt. The model must still call tools for live metrics.
+`buildLlmContext` adds a **Long-term memory** section to the system prompt. Recent turns are trimmed by **estimated token budget** (`ASSISTANT_CONTEXT_*` — see `docs/PROMPT_ENGINEERING.md` and `wingman-context.util.ts`). When turns are dropped and no thread summary exists yet, `ThreadSummaryService` runs (from **8+** messages). The model must still call tools for live metrics.
 
 ## API
 
@@ -47,5 +56,5 @@ ASSISTANT_MEMORY_MIN_NEW_MESSAGES=4
 ## Demo
 
 1. In Wingman: “I don't like cilantro and I'm trying to cut carbs”
-2. Start a **new thread** (or refresh) and ask: “What do you remember about my food preferences?”
-3. Open **Memory** in the wingman panel to inspect or clear
+2. Tap **History** → **New chat**, then ask: “What do you remember about my food preferences?”
+3. Open **Memory** in the wingman panel to inspect or clear (cross-session facts, not thread list)

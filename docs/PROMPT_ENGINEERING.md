@@ -44,7 +44,20 @@ Execution: `apps/api/src/assistant/assistant-tools.service.ts`
 
 **Count:** 11 tools in `assistant-tool-definitions.ts`. User-facing logging for habits is `PUT /daily-check-in` on Overview (not a wingman tool).
 
-Tool traces are stored on assistant messages (`toolTraces` JSON).
+## Token windowing
+
+History sent to the LLM is trimmed by **estimated token budget** (not a fixed turn count):
+
+| Env | Default | Purpose |
+|-----|---------|---------|
+| `ASSISTANT_CONTEXT_TOKEN_BUDGET` | 12000 | Budget for system prompt + history |
+| `ASSISTANT_CONTEXT_REPLY_RESERVE` | 2500 | Reserved for assistant reply + tool rounds |
+| `ASSISTANT_CHARS_PER_TOKEN` | 4 | Rough chars-per-token estimate |
+| `ASSISTANT_CONTEXT_MIN_TURNS` | 4 | Minimum recent turns to keep when possible |
+| `ASSISTANT_CONTEXT_MAX_MESSAGES` | 120 | Max DB messages considered before trimming |
+
+Implementation: `apps/api/src/assistant/wingman-context.util.ts`. Thread summary (`ThreadSummaryService`) compresses older turns when a thread grows (from 8+ messages). Long-term memory: `docs/LONG_TERM_MEMORY.md`.
+
 
 ## Confirmed actions (not silent tools)
 

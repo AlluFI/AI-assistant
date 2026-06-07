@@ -27,7 +27,7 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 | Daily + weekly meal generation | `POST /api/meal-plans/generate` with `duration: daily` and `duration: weekly`; verify plans returned and persisted. |
 | Meal structure customization | Set `mealsPerDay` + `snacksPerDay` in nutrition profile, regenerate, verify resulting slot structure updates. |
 | Meal details include nutrition | `GET /api/meal-plans/:id` / version fetch includes meal title/type/time + macro nutrition per meal. |
-| Alternatives + replacements | Use meal alternatives in UI or `POST /api/meal-plans/versions/:versionId/meals/:mealId/alternative`. |
+| Alternatives + replacements | Use meal alternatives in UI or `POST /api/meal-plans/versions/:versionId/meals/:mealId/alternative`; **Replace recipe** panel or `POST .../meals/:mealId/replace-recipe`. |
 | Swaps/reordering across schedule | Use swap flow + drag reorder in Nutrition UI or call `POST /api/meal-plans/versions/:versionId/swap` and `POST /api/meal-plans/versions/:versionId/reorder`. |
 | Manual meal additions | Use UI "Add manual meal" or call `POST /api/meal-plans/versions/:versionId/meals`. |
 | Regenerate meal / whole plan versions | Per-meal regenerate via `POST /api/meal-plans/versions/:versionId/meals/:mealId/regenerate`; whole plan via new generation + version history/restore. |
@@ -65,6 +65,7 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 | Prompt strategy + params | Review `SECURITY_AND_AI_DECISIONS.md` and code usage for few-shot, sequential prompts, temperature/top-p rationale. |
 | API error UX + recovery | Trigger invalid payloads/timeouts/missing AI key; verify user-facing messages and fallback responses remain graceful. |
 | Meal plan versioning + restore | Generate multiple plan versions, restore prior version (`POST /api/meal-plans/:planId/versions/:versionId/restore`). |
+| Plan date validity + reapply | Expired plans (`isExpired` / past `endDate`) excluded from Today and default Generate; **Browse past plans** → `POST /api/meal-plans/:id/reapply` with new `startDate`. |
 
 ---
 
@@ -91,12 +92,13 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 ### 4) Meal planning operations
 
 - Generate **daily** and **weekly** plans
-- Swap meals (including across days), reorder meals, regenerate one meal
+- Swap meals (including across days), reorder meals, regenerate one meal, **replace recipe** on a slot
 - Add a manual meal
 - **Confirm recipes** (AI-generated drafts persisted)
 - **Create shopping list** for the plan version (ingredients only after confirm)
 - **View recipe** on a meal card; scale servings in the modal
 - Restore an older version
+- **Browse past plans** on Nutrition → reapply an expired plan with a new start date
 
 ### 5) Recipes + substitutions + scaling
 
@@ -120,7 +122,7 @@ The list below follows the mandatory Part 2 review intent and maps each area to 
 
 ### 8) Overview — Today, quick log, habits
 
-- Open **Overview** → **Today** (calories left, protein ring, next meal)
+- Open **Overview** → **Today** (calories left, **Macros today** — protein/carbs/fats, next meal)
 - **Quick food log** from a recipe; confirm intake on Today refreshes
 - **Daily check-in** (sleep, water, mood, optional steps); wellness gauge **Check-in (7d)** when habits logged
 - Optional **Import demo wearable data** (pre-fills steps/sleep)

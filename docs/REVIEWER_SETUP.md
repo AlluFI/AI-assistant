@@ -46,7 +46,7 @@ pnpm dev:web    # terminal 2 — http://localhost:5173
 | Part | Where to look |
 |------|----------------|
 | 1–2 | Overview (**Today**, quick food log, check-in with optional steps), **Weight & activity**, Profile, Insights, Nutrition; optional **Admin** (`docs/ADMIN.md`); `REVIEW_CHECKLIST.md`, `TEST_MATRIX.md`, `docs/DAILY_WELLNESS.md` |
-| 3 wingman | Floating chat (💬), setup wizard (`docs/WINGMAN_ONBOARDING.md`), 11 tools; `apps/api/src/assistant/`, Swagger **assistant** tag; optional `GET /api/assistant/bootstrap` (provider + DB readiness) |
+| 3 wingman | Floating chat (💬), **History** (thread list / New chat), setup wizard (`docs/WINGMAN_ONBOARDING.md`), 11 tools; `apps/api/src/assistant/`, Swagger **assistant** tag; optional `GET /api/assistant/bootstrap` (provider + DB readiness) |
 
 ```bash
 curl -s http://localhost:3000/api/assistant/bootstrap | jq   # optional
@@ -61,11 +61,11 @@ pnpm wingman:eval
 | `ANTHROPIC_API_KEY` | Wingman chat (Part 3; or `OPENAI_API_KEY` with `ASSISTANT_LLM_PROVIDER=openai`) |
 | `GEMINI_API_KEY` | Meal photo vision on Nutrition tab (`docs/MEAL_PHOTOS.md`) |
 
-Wingman options: `ASSISTANT_STREAMING=true`, `ASSISTANT_SUMMARY_MODE=llm`, `VITE_ASSISTANT_STREAMING=true` (web).
+Wingman options: `ASSISTANT_STREAMING=true`, `ASSISTANT_SUMMARY_MODE=llm`, `ASSISTANT_CONTEXT_*` (token-aware history — see `docs/PROMPT_ENGINEERING.md`), `VITE_ASSISTANT_STREAMING=true` (web).
 
 Offline routing check: `pnpm wingman:eval` (see `docs/WINGMAN_EVAL.md`).
 
-Long-term memory: `GET/DELETE /api/assistant/memory`, wingman **Memory** panel — see `docs/LONG_TERM_MEMORY.md`.
+Long-term memory: `GET/DELETE /api/assistant/memory`, wingman **Memory** panel (distinct from **History** threads) — see `docs/LONG_TERM_MEMORY.md`.
 
 Without keys, Parts 1–2 use deterministic fallbacks where documented in `SECURITY_AND_AI_DECISIONS.md`.
 

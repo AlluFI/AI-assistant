@@ -10,10 +10,11 @@ POST   /assistant/threads
        → { id, createdAt }
 
 GET    /assistant/threads
-       → [{ id, title?, updatedAt, preview }]
+       → [{ id, title?, coachingMode, updatedAt (ISO), messageCount,
+            lastMessageAt?, preview, previewRole }]
 
 GET    /assistant/threads/:threadId
-       → { id, summary?, messages: [...] }
+       → { id, summary?, coachingMode, messages: [...] }
 
 DELETE /assistant/threads/:threadId
 ```
@@ -32,11 +33,21 @@ POST   /assistant/threads/:threadId/messages
 ### Server-side loop (non-streaming)
 
 1. Persist user message  
-2. Build context: profile snapshot + thread summary + last N messages  
+2. Build context: profile snapshot + long-term memory + thread summary + **token-trimmed** recent messages (`wingman-context.util.ts`)  
 3. Call LLM with tool definitions  
 4. While `tool_calls`: execute tools → append tool results → call LLM again (max 5 rounds)  
 5. Persist assistant message + traces  
-6. If token count high → async summarize thread  
+6. If turns were dropped and no summary yet → async `ThreadSummaryService` (from **8+** messages)  
+
+### Context env (defaults in `.env.example`)
+
+| Env | Default | Purpose |
+|-----|---------|---------|
+| `ASSISTANT_CONTEXT_TOKEN_BUDGET` | 12000 | Budget for system + history |
+| `ASSISTANT_CONTEXT_REPLY_RESERVE` | 2500 | Reserved for reply + tool rounds |
+| `ASSISTANT_CHARS_PER_TOKEN` | 4 | Chars-per-token estimate |
+| `ASSISTANT_CONTEXT_MIN_TURNS` | 4 | Minimum recent turns when possible |
+| `ASSISTANT_CONTEXT_MAX_MESSAGES` | 120 | Max DB messages considered |
 
 ## Context injection (every turn)
 
@@ -89,6 +100,7 @@ Mirror existing services — thin wrappers, no duplicate business logic.
 ## Web UI (sketch)
 
 - Floating panel or dedicated **Assistant** tab next to Overview / Nutrition  
-- Message list + composer  
+- Message list + composer; **History** button → thread list, switch thread, **New chat**  
+- **Memory** panel for cross-session facts (separate from thread History)  
 - Render `uiBlocks` inline (Recharts wrappers shared with dashboard)  
 - “Suggested prompts” chips: “How am I doing this week?”, “Explain my deficit chart”

@@ -107,6 +107,7 @@ export class AssistantService {
       orderBy: { updatedAt: 'desc' },
       take: 50,
       include: {
+        _count: { select: { messages: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -117,8 +118,12 @@ export class AssistantService {
     return rows.map((t) => ({
       id: t.id,
       title: t.title,
-      updatedAt: t.updatedAt,
+      coachingMode: t.coachingMode,
+      updatedAt: t.updatedAt.toISOString(),
+      messageCount: t._count.messages,
+      lastMessageAt: t.messages[0]?.createdAt?.toISOString() ?? null,
       preview: t.messages[0]?.content?.slice(0, 120) ?? null,
+      previewRole: t.messages[0]?.role ?? null,
     }));
   }
 

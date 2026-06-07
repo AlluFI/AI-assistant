@@ -2,7 +2,7 @@
 
 Fast pass/fail for reviewers and self-review before submission.  
 Mark `[x]` when **verified in your environment** (live demo or test).  
-**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for what is already built in the repo (11 wingman tools, onboarding wizard, check-in wellness component).
+**Code audit (2026-05-28):** see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for token-aware context, History UI, meal plan date validity, Today macros overview.
 
 **Detailed criteria:** [PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md](./PROJECT_REQUIREMENTS_AND_TESTING_CRITERIA.md)  
 **API/UI steps:** [TEST_MATRIX_PART3.md](./TEST_MATRIX_PART3.md)
@@ -43,7 +43,7 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] Very long / special character input handled
 - [ ] Malformed input does not corrupt thread state
 
-**Built in repo:** `WingmanChat.tsx`, Prisma threads, `@MaxLength(8000)` on content, empty blocked in UI/API.
+**Built in repo:** `WingmanChat.tsx` (History panel, New chat), Prisma threads, `@MaxLength(8000)` on content, empty blocked in UI/API.
 
 ---
 
@@ -140,12 +140,12 @@ Mark `[x]` when **verified in your environment** (live demo or test).
 - [ ] NL → bar chart (protein vs target)
 - [ ] NL → pie chart (macros today)
 - [ ] Proactive chart suggestion in conversation
-- [ ] History compression after 10+ turns
+- [ ] History compression after 10+ turns (token trim + thread summary)
 - [ ] Dynamic context on topic shift
 - [ ] Graceful AI outage fallback
 - [ ] Bonus features documented
 
-**Built in repo:** Charts, summary at 12+ msgs, `IMPLEMENTATION_STATUS.md` bonus table; meal photos + streaming documented.
+**Built in repo:** Charts, token-aware context + summary from 8+ msgs (`wingman-context.util.ts`), `IMPLEMENTATION_STATUS.md` bonus table; meal photos + streaming documented.
 
 ---
 

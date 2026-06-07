@@ -8,7 +8,7 @@ After sign-in, open **Overview**. At the top:
 
 | Card | Purpose |
 |------|---------|
-| **Today** | Calories left, protein ring, next planned meal, activity this week, reminders, 7-day adherence, streaks |
+| **Today** | Calories left, **macros today** (protein / carbs / fats rings vs daily targets), next planned meal, activity this week, reminders, 7-day adherence, streaks |
 | **Quick food log** | Log food outside the meal plan (recipe search or single ingredient) |
 | **Daily check-in** | Sleep, water, mood, optional **steps** on main form; collapsible demo wearable import; **7-day habits average feeds ~12.5% of wellness score** (steps shown on Today only) |
 
@@ -31,7 +31,7 @@ Data loads via `GET /api/today` together with existing overview charts (`loadTre
 - `checkIn` — today's `DailyCheckIn` or `null`
 - `checkInDayScore` — 0–100 for today from sleep/water/mood logged
 - `checkInWeekScore` — 7-day check-in habits average (used in wellness score when present)
-- `nextMeal` — next uneaten slot from active meal plan (if any)
+- `nextMeal` — next uneaten slot from a meal plan whose date range **covers today** (`planCoversDate`); `null` when no active plan for the day (expired plans do not populate Today or wingman `get_meal_plan` for today)
 - `reminders` — `weightDue`, `activityDue` (7-day weight / cadence-based activity)
 - `activityWeek` — active days this week vs `weeklyActivityDays` from health profile
 - `adherence` — 7-day planned vs eaten meal counts and `adherencePercent`
@@ -76,12 +76,13 @@ Migration: `20260603120000_daily_wellness`.
 ## Manual test flow
 
 1. Sign in (`demo@numbers.local` after `pnpm demo:seed`).
-2. **Overview** → confirm **Today** shows calories left and protein %.
+2. **Overview** → confirm **Today** shows calories left and **Macros today** (protein, carbs, fats % and g vs targets).
 3. **Quick food log** → search a recipe → **Log food** → Today calories update after refresh.
 4. **Daily check-in** → save sleep/water/mood (optional steps) → wellness gauge **Check-in (7d)** bar and Today card update; steps show on Today when set.
 5. Expand **Import demo wearable data** → import steps/sleep → steps pre-fill the form (demo source).
-6. **Nutrition** → generate meal plan → return to Overview → **Next meal** populated.
-7. Mark meals eaten on meal plan → adherence % and logging streak increase.
+6. **Nutrition** → generate meal plan (or **Browse past plans** → reapply with today's start date) → return to Overview → **Next meal** populated.
+7. Let a plan expire (start date in the past) → **Today** shows no next meal; Nutrition plan dropdown lists only plans covering today.
+8. Mark meals eaten on meal plan → adherence % and logging streak increase.
 
 ## Code layout
 

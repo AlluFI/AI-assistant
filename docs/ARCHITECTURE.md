@@ -21,7 +21,7 @@ sequenceDiagram
   Tools->>DB: analytics, meal plan, logs
   Tools->>RAG: search recipes / history (v2)
   Tools-->>API: structured facts + chart series
-  API->>LLM: system + summary + tools results + last N turns
+  API->>LLM: system + summary + tools results + token-trimmed history
   LLM-->>API: reply + optional tool_calls loop
   API->>DB: persist messages + tool traces
   API-->>Web: message + ui_blocks (charts, CTAs)
@@ -45,8 +45,8 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 
 | Type | Storage | Used for |
 |------|---------|----------|
-| Working | Last 10 messages in prompt | Exact follow-ups |
-| Thread summary | `AssistantThread.summary` (LLM or rule, 12+ messages) | Long conversations |
+| Working | Recent messages trimmed to token budget (`wingman-context.util.ts`) | Exact follow-ups within budget |
+| Thread summary | `AssistantThread.summary` (LLM or rule, from **8+** messages) | Long conversations |
 | Authoritative facts | Profile snapshot injected each turn | Goals, restrictions, targets |
 | Cross-session | `AssistantUserMemory` (narrative + facts JSON) | Preferences across threads — see [LONG_TERM_MEMORY.md](./LONG_TERM_MEMORY.md) |
 
@@ -58,7 +58,7 @@ Use **code + SQL** first. Add a **cheap classifier** (rules or mini model) only 
 |------|--------|------------------|
 | `get_health_metrics` | profile + analytics | “What’s my BMI?” |
 | `get_progress_summary` | analytics | “How close to my goal?” |
-| `get_meal_plan` | meal-plans | “What’s for dinner today?” |
+| `get_meal_plan` | meal-plans (plan covering requested date) | “What’s for dinner today?” |
 | `get_recipe` | recipes | “How do I prepare tonight’s meal?” |
 | `get_nutrition_summary` | nutrition-analytics | “Calories today vs target?” |
 | `search_recipes` | recipes + RAG | “High protein lunch ideas” |

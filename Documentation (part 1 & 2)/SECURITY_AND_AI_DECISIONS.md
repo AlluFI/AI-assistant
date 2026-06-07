@@ -19,7 +19,7 @@ This document is a concise review companion for all "student can explain" criter
 - **Response caching vs regeneration**:
   - regeneration: new model call using latest context
   - cached fallback: reuses most recent stored recommendations when AI provider is down or key is missing
-- **Context length tradeoff**: More history improves continuity but increases token usage and latency; we use bounded history windows and essential summary fields.
+- **Context length tradeoff**: More history improves continuity but increases token usage and latency; Parts 1–2 use bounded summary fields; Part 3 wingman uses **token-budget trimming** (`ASSISTANT_CONTEXT_*`) plus thread summaries from 8+ messages.
 - **Zero-shot vs few-shot tradeoff**:
   - zero-shot is simpler and cheaper to iterate
   - few-shot improves consistency but increases prompt size and token cost

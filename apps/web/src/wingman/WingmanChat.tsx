@@ -33,6 +33,28 @@ type ThreadPayload = {
   messages: WingmanMessage[]
 }
 
+type ThreadListItem = {
+  id: string
+  title: string | null
+  coachingMode?: WingmanCoachingMode
+  updatedAt: string
+  messageCount: number
+  lastMessageAt: string | null
+  preview: string | null
+  previewRole: string | null
+}
+
+function formatThreadWhen(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function onboardingOpenerMessage(opener: WingmanOnboardingStatus['opener']): WingmanMessage {
   return {
     id: `onboarding-opener-${Date.now()}`,
@@ -103,6 +125,9 @@ export function WingmanChat({
   const [error, setError] = useState<string | null>(null)
   const [coachingMode, setCoachingMode] = useState<WingmanCoachingMode>('balanced')
   const [showMemory, setShowMemory] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [threadList, setThreadList] = useState<ThreadListItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [memory, setMemory] = useState<{
     narrative: string | null
     facts: Array<{ category: string; text: string }>
@@ -174,6 +199,73 @@ export function WingmanChat({
     [authFetch],
   )
 
+  const loadThreads = useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await authFetch('/assistant/threads')
+      const body = await readApiJson<ThreadListItem[]>(res)
+      if (res.ok && Array.isArray(body)) setThreadList(body)
+    } catch {
+      /* keep previous list */
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [authFetch])
+
+  const loadOpening = useCallback(async () => {
+    const res = await authFetch('/assistant/nudges')
+    const nudges = await readApiJson<WingmanNudges>(res)
+    if (!res.ok) throw new Error('Could not load wingman nudges')
+    setMessages([nudgesToMessage(nudges)])
+  }, [authFetch])
+
+  const switchThread = useCallback(
+    async (id: string) => {
+      setBusy(true)
+      setError(null)
+      try {
+        setThreadId(id)
+        sessionStorage.setItem(THREAD_KEY, id)
+        const ok = await loadThread(id)
+        if (!ok) await loadOpening()
+        setShowHistory(false)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not open conversation')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [loadOpening, loadThread],
+  )
+
+  const startNewChat = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await authFetch('/assistant/threads', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Wingman', coachingMode: 'balanced' }),
+      })
+      const body = await readApiJson<{ id: string }>(res)
+      if (!res.ok) throw new Error('Could not start a new chat')
+      setThreadId(body.id)
+      sessionStorage.setItem(THREAD_KEY, body.id)
+      setCoachingMode('balanced')
+      if (onboarding?.active && onboarding.opener) {
+        setCoachingMode('onboarding')
+        setMessages([onboardingOpenerMessage(onboarding.opener)])
+      } else {
+        await loadOpening()
+      }
+      setShowHistory(false)
+      void loadThreads()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start a new chat')
+    } finally {
+      setBusy(false)
+    }
+  }, [authFetch, loadOpening, loadThreads, onboarding])
+
   const loadMemory = useCallback(async () => {
     const res = await authFetch('/assistant/memory')
     const body = await readApiJson<{
@@ -195,13 +287,6 @@ export function WingmanChat({
     } finally {
       setBusy(false)
     }
-  }, [authFetch])
-
-  const loadOpening = useCallback(async () => {
-    const res = await authFetch('/assistant/nudges')
-    const nudges = await readApiJson<WingmanNudges>(res)
-    if (!res.ok) throw new Error('Could not load wingman nudges')
-    setMessages([nudgesToMessage(nudges)])
   }, [authFetch])
 
   const showOnboardingOpener = useCallback(() => {
@@ -552,12 +637,27 @@ export function WingmanChat({
               ) : null}
               <button
                 type="button"
+                className={`wingmanHistoryBtn${showHistory ? ' active' : ''}`}
+                hidden={onboardingActive}
+                aria-expanded={showHistory}
+                disabled={busy}
+                onClick={() => {
+                  setShowHistory((v) => !v)
+                  setShowMemory(false)
+                  void loadThreads()
+                }}
+              >
+                History
+              </button>
+              <button
+                type="button"
                 className={`wingmanMemoryBtn${showMemory ? ' active' : ''}`}
                 hidden={onboardingActive}
                 aria-expanded={showMemory}
                 disabled={busy}
                 onClick={() => {
                   setShowMemory((v) => !v)
+                  setShowHistory(false)
                   void loadMemory()
                 }}
               >
@@ -573,6 +673,57 @@ export function WingmanChat({
               </button>
             </div>
           </header>
+
+          {showHistory ? (
+            <section className="wingmanHistoryPanel" aria-label="Past conversations">
+              <div className="wingmanHistoryHead">
+                <p className="wingmanHistoryIntro">Earlier Wingman chats on this account.</p>
+                <button
+                  type="button"
+                  className="wingmanHistoryNew"
+                  disabled={busy}
+                  onClick={() => void startNewChat()}
+                >
+                  New chat
+                </button>
+              </div>
+              {historyLoading ? (
+                <p className="wingmanHistoryEmpty">Loading…</p>
+              ) : threadList.length === 0 ? (
+                <p className="wingmanHistoryEmpty">No saved conversations yet.</p>
+              ) : (
+                <ul className="wingmanHistoryList">
+                  {threadList.map((t) => {
+                    const active = t.id === threadId
+                    const label =
+                      t.title?.trim() ||
+                      (t.preview
+                        ? t.preview.slice(0, 48) + (t.preview.length > 48 ? '…' : '')
+                        : 'Conversation')
+                    return (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          className={`wingmanHistoryItem${active ? ' active' : ''}`}
+                          disabled={busy}
+                          onClick={() => void switchThread(t.id)}
+                        >
+                          <span className="wingmanHistoryTitle">{label}</span>
+                          <span className="wingmanHistoryMeta">
+                            {formatThreadWhen(t.updatedAt)}
+                            {t.messageCount > 0 ? ` · ${t.messageCount} messages` : ''}
+                          </span>
+                          {t.preview && t.id !== threadId ? (
+                            <span className="wingmanHistoryPreview">{t.preview}</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
           {showMemory ? (
             <section className="wingmanMemoryPanel" aria-label="Long-term memory">
