@@ -582,11 +582,9 @@ export function WingmanChat({
           <header className="wingmanHeader">
             <div>
               <h2>{onboardingActive ? 'Setup with Wingman' : 'Wingman'}</h2>
-              <p>
-                {onboardingActive && onboarding
-                  ? `Step ${Math.min(onboarding.steps.length, onboarding.steps.findIndex((s) => s.id === onboarding.step) + 1 || 1)} of ${onboarding.steps.length} · answer in chat or tap confirm`
-                  : 'Log weight & activities · gentle reminders'}
-              </p>
+              {onboardingActive && onboarding ? (
+                <p>{`Step ${Math.min(onboarding.steps.length, onboarding.steps.findIndex((s) => s.id === onboarding.step) + 1 || 1)} of ${onboarding.steps.length} · answer in chat or tap confirm`}</p>
+              ) : null}
               {onboardingActive && onboarding ? (
                 <div
                   className="wingmanOnboardingProgress"
